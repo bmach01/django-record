@@ -1,0 +1,66 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Home - Discord{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="home-container">
+        <div class="welcome-card">
+            <h1>👋 Witaj, {{ user.username }}!</h1>
+            <p style="color: #666; font-size: 1.1rem;">
+                To jest uproszczona wersja Discorda. Ta strona to placeholder. Wkrótce tutaj będą serwery, kanały i wiadomości!
+            </p>
+        </div>
+
+        <div class="user-info">
+            <h2 style="color: #333; margin-bottom: 1.5rem;">📋 Informacje o Profilu</h2>
+            
+            <div class="info-row">
+                <span class="info-label">Nazwa użytkownika:</span>
+                <span class="info-value">{{ user.username }}</span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span class="info-value">{{ user.email }}</span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Imię i Nazwisko:</span>
+                <span class="info-value">{{ user.first_name }} {{ user.last_name }}</span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">Rola:</span>
+                <span class="info-value">
+                    {{ user.get_role_display }}
+                    <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
+                </span>
+            </div>
+
+            {% if user.description %}
+                <div class="info-row">
+                    <span class="info-label">Opis:</span>
+                    <span class="info-value">{{ user.description }}</span>
+                </div>
+            {% else %}
+                <div class="info-row">
+                    <span class="info-label">Opis:</span>
+                    <span class="info-value" style="color: #999;">Brak opisu</span>
+                </div>
+            {% endif %}
+
+            <div class="info-row">
+                <span class="info-label">Członek od:</span>
+                <span class="info-value">{{ user.date_joined|date:"Y-m-d H:i" }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Discord - Uproszczona Wersja{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav>
+        <div>
+            <a href="{% url 'home' %}" style="font-weight: bold; font-size: 1.2rem;">Discord</a>
+        </div>
+        <div>
+            {% if user.is_authenticated %}
+                <span>Zalogowany: <strong>{{ user.username }}</strong></span>
+                <a href="{% url 'logout' %}">Wyloguj się</a>
+            {% else %}
+                <a href="{% url 'login' %}">Logowanie</a>
+                <a href="{% url 'register' %}">Rejestracja</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    {% if messages %}
+        <div class="container">
+            <div style="width: 100%; max-width: 600px;">
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+    <script>
+        // Ukryj wiadomości po 5 sekundach
+        setTimeout(() => {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                alert.style.transition = 'opacity 0.5s';
+                alert.style.opacity = '0';
+                setTimeout(() => alert.remove(), 500);
+            });
+        }, 5000);
+    </script>
+</body>
+</html>

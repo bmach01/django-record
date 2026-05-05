@@ -1,0 +1,83 @@
+/* Home Page Specific Styles */
+
+.home-container {
+    max-width: 1200px;
+    width: 100%;
+    padding: 2rem;
+}
+
+.welcome-card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.welcome-card h1 {
+    color: #667eea;
+    margin-bottom: 1rem;
+}
+
+.welcome-card p {
+    color: #666;
+    font-size: 1.1rem;
+}
+
+/* User Info Section */
+.user-info {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.user-info h2 {
+    color: #333;
+    margin-bottom: 1.5rem;
+}
+
+.info-row {
+    display: flex;
+    padding: 1rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    font-weight: 600;
+    color: #667eea;
+    min-width: 150px;
+}
+
+.info-value {
+    color: #333;
+}
+
+/* Badge Styles */
+.badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-top: 1rem;
+}
+
+.badge-user {
+    background: #e7f3ff;
+    color: #0066cc;
+}
+
+.badge-moderator {
+    background: #fff3cd;
+    color: #997404;
+}
+
+.badge-admin {
+    background: #f8d7da;
+    color: #721c24;
+}
