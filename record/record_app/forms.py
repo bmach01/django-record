@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
+from .models import Channel, Message
 
 User = get_user_model()
 
@@ -88,3 +89,54 @@ class RegisterForm(UserCreationForm):
         if commit:
             user.save()
         return user
+
+
+class ChannelForm(forms.ModelForm):
+    class Meta:
+        model = Channel
+        fields = ('name', 'description', 'channel_type', 'is_public')
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nazwa kanału',
+                'maxlength': '100'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Opis kanału (opcjonalnie)',
+                'rows': 3
+            }),
+            'channel_type': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'is_public': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+    
+    def clean_name(self):
+        name = self.cleaned_data.get('name')
+        if not name:
+            raise forms.ValidationError("Nazwa kanału jest wymagana.")
+        if len(name) < 3:
+            raise forms.ValidationError("Nazwa kanału musi mieć co najmniej 3 znaki.")
+        return name
+
+
+class MessageForm(forms.ModelForm):
+    class Meta:
+        model = Message
+        fields = ('content',)
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Napisz wiadomość...',
+                'rows': 2
+            })
+        }
+    
+    def clean_content(self):
+        content = self.cleaned_data.get('content')
+        if not content or not content.strip():
+            raise forms.ValidationError("Wiadomość nie może być pusta.")
+        return content

@@ -1,0 +1,67 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Zaproś użytkownika - Record{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 40px auto;">
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h3 style="margin: 0;">👥 Zaproś użytkownika do kanału</h3>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 20px;">
+                <strong>Kanał:</strong> 
+                {% if channel.channel_type == 'text' %}#{% else %}🔊{% endif %} 
+                {{ channel.name }}
+            </p>
+
+            {% if users %}
+            <form method="POST">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="user_id" class="form-label">Wybierz użytkownika:</label>
+                    <select class="form-control" id="user_id" name="user_id" required>
+                        <option value="">-- Wybierz użytkownika --</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}">
+                            {{ user.username }} ({{ user.get_role_display }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">👥 Zaproś</button>
+                    <a href="{% url 'home' %}" class="btn btn-secondary">Anuluj</a>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-info">
+                Wszyscy użytkownicy (oprócz twojego konta) są już zaproszeni do tego kanału.
+            </div>
+            <a href="{% url 'home' %}" class="btn btn-secondary">Wróć</a>
+            {% endif %}
+
+            <hr style="margin-top: 30px;">
+            
+            <h5 style="margin-top: 20px;">Członkowie kanału:</h5>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <ul style="margin: 0; padding-left: 20px;">
+                    {% for membership in channel.members.all %}
+                    <li style="margin-bottom: 8px;">
+                        <strong>{{ membership.user.username }}</strong>
+                        <span style="color: #999; font-size: 0.9rem;">({{ membership.user.get_role_display }})</span>
+                        {% if membership.user == channel.created_by %}
+                        <span class="badge bg-success">Właściciel</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -2,65 +2,178 @@
 
 {% load static %}
 
-{% block title %}Home - Discord{% endblock %}
+{% block title %}Home - Record{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="home-container">
-        <div class="welcome-card">
-            <h1>👋 Witaj, {{ user.username }}!</h1>
-            <p style="color: #666; font-size: 1.1rem;">
-                To jest uproszczona wersja Discorda. Ta strona to placeholder. Wkrótce tutaj będą serwery, kanały i wiadomości!
-            </p>
-        </div>
-
-        <div class="user-info">
-            <h2 style="color: #333; margin-bottom: 1.5rem;">📋 Informacje o Profilu</h2>
-            
-            <div class="info-row">
-                <span class="info-label">Nazwa użytkownika:</span>
-                <span class="info-value">{{ user.username }}</span>
+<div class="record-wrapper">
+    <div class="record-layout">
+        <!-- Sidebar z kanałami - 2 kolumny -->
+        <aside class="channels-sidebar">
+            <div class="sidebar-header">
+                <h5>
+                    📡 Kanały
+                </h5>
+                {% if is_admin %}
+                <a href="{% url 'create_channel' %}" class="btn btn-sm btn-primary">
+                    ➕ Nowy kanał
+                </a>
+                {% endif %}
             </div>
 
-            <div class="info-row">
-                <span class="info-label">Email:</span>
-                <span class="info-value">{{ user.email }}</span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Imię i Nazwisko:</span>
-                <span class="info-value">{{ user.first_name }} {{ user.last_name }}</span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Rola:</span>
-                <span class="info-value">
-                    {{ user.get_role_display }}
-                    <span class="badge badge-{{ user.role }}">{{ user.get_role_display }}</span>
-                </span>
-            </div>
-
-            {% if user.description %}
-                <div class="info-row">
-                    <span class="info-label">Opis:</span>
-                    <span class="info-value">{{ user.description }}</span>
+            <div class="channels-grid">
+                <!-- Kanały tekstowe -->
+                <div class="channel-column">
+                    <h6 class="channel-column-title">Tekstowe</h6>
+                    <div class="channel-list">
+                        {% for channel in text_channels %}
+                        <div class="channel-item">
+                            <a href="?channel_id={{ channel.id }}" 
+                               class="channel-link {% if selected_channel.id == channel.id %}active{% endif %}">
+                                # {{ channel.name }}
+                                {% if channel.is_public %}
+                                <span class="badge-public">🌐</span>
+                                {% endif %}
+                            </a>
+                            {% if is_admin %}
+                            <div class="channel-actions">
+                                <a href="{% url 'edit_channel' channel.id %}" title="Edytuj" class="action-btn">✏️</a>
+                                <a href="{% url 'invite_channel' channel.id %}" title="Zaproś" class="action-btn">👥</a>
+                                <a href="{% url 'delete_channel' channel.id %}" title="Usuń" class="action-btn">🗑️</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if not text_channels %}
+                        <div style="color: #999; font-size: 0.9rem; padding: 10px; text-align: center;">
+                            Brak kanałów
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
+
+                <!-- Kanały głosowe -->
+                <div class="channel-column">
+                    <h6 class="channel-column-title">Głosowe</h6>
+                    <div class="channel-list">
+                        {% for channel in voice_channels %}
+                        <div class="channel-item">
+                            <a href="?channel_id={{ channel.id }}" 
+                               class="channel-link {% if selected_channel.id == channel.id %}active{% endif %}">
+                                🔊 {{ channel.name }}
+                                {% if channel.is_public %}
+                                <span class="badge-public">🌐</span>
+                                {% endif %}
+                            </a>
+                            {% if is_admin %}
+                            <div class="channel-actions">
+                                <a href="{% url 'edit_channel' channel.id %}" title="Edytuj" class="action-btn">✏️</a>
+                                <a href="{% url 'invite_channel' channel.id %}" title="Zaproś" class="action-btn">👥</a>
+                                <a href="{% url 'delete_channel' channel.id %}" title="Usuń" class="action-btn">🗑️</a>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if not voice_channels %}
+                        <div style="color: #999; font-size: 0.9rem; padding: 10px; text-align: center;">
+                            Brak kanałów
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informacja o profilu -->
+            <div class="sidebar-footer">
+                <strong>{{ user.username }}</strong>
+                <small>{{ user.get_role_display }}</small>
+            </div>
+        </aside>
+
+        <!-- Główny obszar - Chat -->
+        <main class="chat-area">
+            {% if selected_channel %}
+            <!-- Header kanału -->
+            <div class="chat-header">
+                <div class="channel-title">
+                    <h3>
+                        {% if selected_channel.channel_type == 'text' %}#{% else %}🔊{% endif %}
+                        {{ selected_channel.name }}
+                    </h3>
+                    {% if selected_channel.description %}
+                    <p class="channel-description">{{ selected_channel.description }}</p>
+                    {% endif %}
+                </div>
+                {% if is_admin %}
+                <div class="header-actions">
+                    <a href="{% url 'edit_channel' selected_channel.id %}" class="btn btn-sm btn-warning">✏️ Edytuj</a>
+                    <a href="{% url 'invite_channel' selected_channel.id %}" class="btn btn-sm btn-info">👥 Zaproś</a>
+                    <a href="{% url 'delete_channel' selected_channel.id %}" class="btn btn-sm btn-danger">🗑️ Usuń</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Obszar wiadomości -->
+            <div class="messages-area">
+                <div class="messages-container">
+                    {% if messages|length > 0 %}
+                        {% for message in messages %}
+                        <div class="message">
+                            <div class="message-header">
+                                <strong class="message-author">{{ message.author.username }}</strong>
+                                <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
+                            </div>
+                            <div class="message-content">{{ message.content }}</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <div class="no-messages">
+                        <p>Brak wiadomości w tym kanale. Bądź pierwszy!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Pole do wysyłania wiadomości -->
+            {% if selected_channel.channel_type == 'text' %}
+            <div class="message-input-area">
+                <form method="POST" action="{% url 'send_message' selected_channel.id %}" class="message-form">
+                    {% csrf_token %}
+                    <input type="text" 
+                           name="content" 
+                           class="form-control" 
+                           placeholder="Napisz wiadomość..." 
+                           required>
+                    <button class="btn btn-primary" type="submit">Wyślij</button>
+                </form>
+            </div>
             {% else %}
-                <div class="info-row">
-                    <span class="info-label">Opis:</span>
-                    <span class="info-value" style="color: #999;">Brak opisu</span>
-                </div>
+            <div class="message-input-area voice-notice">
+                <p>🔊 To jest kanał głosowy. Funkcja audio wkrótce.</p>
+            </div>
             {% endif %}
 
-            <div class="info-row">
-                <span class="info-label">Członek od:</span>
-                <span class="info-value">{{ user.date_joined|date:"Y-m-d H:i" }}</span>
+            {% else %}
+            <!-- Brak wybranego kanału -->
+            <div class="empty-state">
+                <h3>👋 Witaj, {{ user.username }}!</h3>
+                <p>Wybierz kanał z lewej strony, aby zacząć.</p>
+                {% if text_channels|length == 0 and voice_channels|length == 0 %}
+                <p class="empty-state-hint">
+                    {% if is_admin %}
+                    Nie ma jeszcze żadnych kanałów. <a href="{% url 'create_channel' %}">Utwórz pierwszy kanał!</a>
+                    {% else %}
+                    Czekaj na zaproszenie do kanału.
+                    {% endif %}
+                </p>
+                {% endif %}
             </div>
-        </div>
+            {% endif %}
+        </main>
     </div>
 </div>
+
 {% endblock %}

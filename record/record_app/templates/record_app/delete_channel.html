@@ -1,0 +1,41 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Usuń kanał - Record{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 40px auto;">
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h3 style="margin: 0;">🗑️ Usuń kanał</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning" role="alert">
+                <strong>⚠️ Ostrzeżenie!</strong> Tej operacji nie można cofnąć.
+            </div>
+            
+            <p>Czy na pewno chcesz usunąć kanał <strong>"{{ channel.name }}"</strong>?</p>
+            
+            <p style="color: #666; font-size: 0.9rem;">
+                Zostaną usunięte:
+            </p>
+            <ul style="color: #666; font-size: 0.9rem;">
+                <li>Kanał i wszystkie jego ustawienia</li>
+                <li>Wszystkie wiadomości w kanale ({{ channel.messages.count }} wiadomości)</li>
+                <li>Wszystkie członkostwa w kanale</li>
+            </ul>
+
+            <form method="POST" style="margin-top: 30px;">
+                {% csrf_token %}
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-danger">
+                        🗑️ Usuń kanał
+                    </button>
+                    <a href="{% url 'home' %}" class="btn btn-secondary">Anuluj</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
