@@ -31,12 +31,14 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "record_app",
 ]
 
@@ -119,3 +121,13 @@ STATIC_URL = "static/"
 
 # Custom User Model
 AUTH_USER_MODEL = "record_app.User"
+
+# ASGI Application
+ASGI_APPLICATION = "record.asgi.application"
+
+# Channels configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}

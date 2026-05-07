@@ -6,6 +6,53 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
+<style>
+    .notification {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        animation: slideIn 0.3s ease-in-out;
+    }
+    
+    .notification-join {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .notification-leave {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .message.new-message {
+        animation: messageSlideIn 0.3s ease-in-out;
+    }
+    
+    @keyframes messageSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -28,9 +75,9 @@
                 <!-- Kanały tekstowe -->
                 <div class="channel-column">
                     <h6 class="channel-column-title">Tekstowe</h6>
-                    <div class="channel-list">
+                    <div class="channel-list" id="text-channels-list">
                         {% for channel in text_channels %}
-                        <div class="channel-item">
+                        <div class="channel-item" data-channel-id="{{ channel.id }}">
                             <a href="?channel_id={{ channel.id }}" 
                                class="channel-link {% if selected_channel.id == channel.id %}active{% endif %}">
                                 # {{ channel.name }}
@@ -58,9 +105,9 @@
                 <!-- Kanały głosowe -->
                 <div class="channel-column">
                     <h6 class="channel-column-title">Głosowe</h6>
-                    <div class="channel-list">
+                    <div class="channel-list" id="voice-channels-list">
                         {% for channel in voice_channels %}
-                        <div class="channel-item">
+                        <div class="channel-item" data-channel-id="{{ channel.id }}">
                             <a href="?channel_id={{ channel.id }}" 
                                class="channel-link {% if selected_channel.id == channel.id %}active{% endif %}">
                                 🔊 {{ channel.name }}
@@ -118,10 +165,10 @@
 
             <!-- Obszar wiadomości -->
             <div class="messages-area">
-                <div class="messages-container">
+                <div class="messages-container" id="messages-container">
                     {% if messages|length > 0 %}
                         {% for message in messages %}
-                        <div class="message">
+                        <div class="message" data-message-id="{{ message.id }}">
                             <div class="message-header">
                                 <strong class="message-author">{{ message.author.username }}</strong>
                                 <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
@@ -140,13 +187,15 @@
             <!-- Pole do wysyłania wiadomości -->
             {% if selected_channel.channel_type == 'text' %}
             <div class="message-input-area">
-                <form method="POST" action="{% url 'send_message' selected_channel.id %}" class="message-form">
+                <form id="message-form" class="message-form">
                     {% csrf_token %}
                     <input type="text" 
+                           id="message-input"
                            name="content" 
                            class="form-control" 
                            placeholder="Napisz wiadomość..." 
-                           required>
+                           required
+                           autocomplete="off">
                     <button class="btn btn-primary" type="submit">Wyślij</button>
                 </form>
             </div>
@@ -175,5 +224,235 @@
         </main>
     </div>
 </div>
+
+<script>
+    // WebSocket Configuration
+    const selectedChannelId = "{{ selected_channel.id|default:'' }}";
+    const userId = "{{ user.id }}";
+    const username = "{{ user.username }}";
+    let chatSocket = null;
+    let channelSocket = null;
+
+    // Funkcja do obsługi WebSocket URI
+    function getWebSocketScheme() {
+        return window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    }
+
+    // Inicjalizacja WebSocket dla chatu
+    function initChatSocket() {
+        if (!selectedChannelId) return;
+
+        const wsScheme = getWebSocketScheme();
+        const wsPath = `${wsScheme}//${window.location.host}/ws/chat/${selectedChannelId}/`;
+        
+        try {
+            chatSocket = new WebSocket(wsPath);
+
+            chatSocket.onopen = (event) => {
+                console.log('WebSocket chat połączony.');
+            };
+
+            chatSocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleChatMessage(data);
+            };
+
+            chatSocket.onclose = (event) => {
+                console.log('WebSocket chat rozłączony.');
+                // Spróbuj ponownie połączyć za 3 sekundy
+                setTimeout(initChatSocket, 3000);
+            };
+
+            chatSocket.onerror = (event) => {
+                console.error('WebSocket error:', event);
+            };
+        } catch (e) {
+            console.error('Error initializing chat socket:', e);
+        }
+    }
+
+    // Inicjalizacja WebSocket dla aktualizacji kanałów
+    function initChannelSocket() {
+        const wsScheme = getWebSocketScheme();
+        const wsPath = `${wsScheme}//${window.location.host}/ws/channels/${userId}/`;
+        
+        try {
+            channelSocket = new WebSocket(wsPath);
+
+            channelSocket.onopen = (event) => {
+                console.log('WebSocket kanałów połączony.');
+            };
+
+            channelSocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleChannelUpdate(data);
+            };
+
+            channelSocket.onclose = (event) => {
+                console.log('WebSocket kanałów rozłączony.');
+                // Spróbuj ponownie połączyć za 3 sekundy
+                setTimeout(initChannelSocket, 3000);
+            };
+
+            channelSocket.onerror = (event) => {
+                console.error('WebSocket error:', event);
+            };
+        } catch (e) {
+            console.error('Error initializing channel socket:', e);
+        }
+    }
+
+    // Obsługa wiadomości czatu
+    function handleChatMessage(data) {
+        if (data.type === 'chat_message') {
+            addMessageToChat(data);
+        } else if (data.type === 'user_joined') {
+            showNotification(`${data.username} dołączył do kanału`, 'notification-join');
+        } else if (data.type === 'user_left') {
+            showNotification(`${data.username} opuścił kanał`, 'notification-leave');
+        }
+    }
+
+    // Obsługa aktualizacji kanałów
+    function handleChannelUpdate(data) {
+        if (data.type === 'channel_created') {
+            // Odśwież stronę lub dodaj kanał do listy
+            location.reload();
+        } else if (data.type === 'channel_deleted') {
+            if (parseInt(selectedChannelId) === data.channel_id) {
+                // Bieżący kanał został usunięty, przejdź do strony głównej
+                location.href = '/';
+            } else {
+                location.reload();
+            }
+        } else if (data.type === 'user_added_to_channel') {
+            location.reload();
+        }
+    }
+
+    // Dodanie wiadomości do interfejsu
+    function addMessageToChat(data) {
+        const container = document.getElementById('messages-container');
+        if (!container) return;
+
+        // Usuń "brak wiadomości" jeśli istnieje
+        const noMessages = container.querySelector('.no-messages');
+        if (noMessages) {
+            noMessages.remove();
+        }
+
+        // Sprawdzenie czy wiadomość już istnieje
+        if (document.querySelector(`[data-message-id="${data.message_id}"]`)) {
+            return; // Wiadomość już istnieje
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message new-message';
+        messageDiv.setAttribute('data-message-id', data.message_id);
+
+        const timestamp = new Date(data.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <strong class="message-author">${escapeHtml(data.username)}</strong>
+                <span class="message-time">${timestamp}</span>
+            </div>
+            <div class="message-content">${escapeHtml(data.message)}</div>
+        `;
+
+        container.appendChild(messageDiv);
+
+        // Scroll do ostatniej wiadomości
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // Wyświetlenie powiadomienia
+    function showNotification(message, className) {
+        const container = document.getElementById('messages-container');
+        if (!container) return;
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${className}`;
+        notification.textContent = message;
+
+        container.appendChild(notification);
+
+        // Usunięcie powiadomienia po 5 sekundach
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+
+        // Scroll do powiadomienia
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // Wysłanie wiadomości
+    function sendMessage(message) {
+        if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
+            // Fallback do formularza HTML jeśli WebSocket nie jest dostępny
+            console.warn('WebSocket nie jest dostępny. Używam formularza.');
+            return false; // Zezwól na tradycyjne wysłanie
+        }
+
+        if (message.trim()) {
+            chatSocket.send(JSON.stringify({
+                type: 'chat_message',
+                message: message,
+            }));
+            return true;
+        }
+
+        return false;
+    }
+
+    // Bezpieczne wyświetlanie tekstu HTML
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Event listener dla formularza wiadomości
+    document.addEventListener('DOMContentLoaded', () => {
+        const messageForm = document.getElementById('message-form');
+        if (messageForm) {
+            messageForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = document.getElementById('message-input');
+                const message = input.value;
+
+                if (sendMessage(message) === false) {
+                    // WebSocket nie zadziałał, wysłanie za pośrednictwem tradycyjnego POST
+                    messageForm.submit();
+                } else {
+                    input.value = '';
+                    input.focus();
+                }
+            });
+        }
+
+        // Inicjalizuj WebSockety
+        initChatSocket();
+        initChannelSocket();
+    });
+
+    // Cleanup po opuszczeniu strony
+    window.addEventListener('beforeunload', () => {
+        if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+            chatSocket.close();
+        }
+        if (channelSocket && channelSocket.readyState === WebSocket.OPEN) {
+            channelSocket.close();
+        }
+    });
+</script>
 
 {% endblock %}
