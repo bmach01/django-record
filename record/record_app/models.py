@@ -79,3 +79,47 @@ class Message(models.Model):
     
     def __str__(self):
         return f"{self.author.username} w {self.channel.name}: {self.content[:50]}"
+
+
+class PrivateConversation(models.Model):
+    """
+    Konwersacja prywatna pomiędzy dwoma użytkownikami.
+    Do takiej rozmowy nie można dodawać kolejnych użytkowników.
+    """
+    participant1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='private_conversations_as_participant1')
+    participant2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='private_conversations_as_participant2')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('participant1', 'participant2')
+        verbose_name = 'Konwersacja prywatna'
+        verbose_name_plural = 'Konwersacje prywatne'
+        ordering = ['-updated_at']
+    
+    def __str__(self):
+        return f"Rozmowa: {self.participant1.username} <-> {self.participant2.username}"
+    
+    def get_other_user(self, user):
+        """Zwraca drugiego uczestnika rozmowy."""
+        if user == self.participant1:
+            return self.participant2
+        return self.participant1
+
+
+class PrivateMessage(models.Model):
+    """
+    Pojedyncza wiadomość prywatna w konwersacji.
+    """
+    conversation = models.ForeignKey(PrivateConversation, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_private_messages')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = 'Wiadomość prywatna'
+        verbose_name_plural = 'Wiadomości prywatne'
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"{self.sender.username}: {self.content[:50]}"

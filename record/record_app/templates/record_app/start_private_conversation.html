@@ -1,0 +1,59 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Nowa Prywatna Rozmowa - Record{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/private_messages.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="private-form-container">
+    <div style="width: 100%; max-width: 450px;">
+        <a href="{% url 'private_conversations' %}" class="back-link">← Wróć do prywatnych wiadomości</a>
+
+        <div class="private-card">
+            <h2>💬 Nowa Rozmowa</h2>
+
+            {% if form.non_field_errors %}
+            <div class="private-error-message">
+                {% for error in form.non_field_errors %}
+                    {{ error }}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="private-info-box">
+                💡 Wybierz użytkownika, z którym chcesz rozmawiać. Rozmowa może odbywać się tylko między dwoma osobami.
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <div class="private-form-group">
+                    <label for="{{ form.username.id_for_label }}">Wybierz użytkownika:</label>
+                    {{ form.username }}
+                    <datalist id="user-options">
+                        {% for user in users %}
+                            <option value="{{ user.username }}">{{ user.get_full_name }}</option>
+                        {% endfor %}
+                    </datalist>
+                    {% if form.username.errors %}
+                    <div class="private-error-message" style="margin-top: 0.5rem;">
+                        {% for error in form.username.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="private-form-actions">
+                    <button type="submit">Rozpocznij Rozmowę</button>
+                    <a href="{% url 'private_conversations' %}">Anuluj</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

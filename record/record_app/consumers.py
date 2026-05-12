@@ -2,7 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
-from .models import Channel, Message, ChannelMembership
+from .models import Channel, Message, ChannelMembership, PrivateConversation, PrivateMessage
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -246,3 +246,109 @@ class ChannelUpdateConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+
+class PrivateChatConsumer(AsyncWebsocketConsumer):
+    """
+    WebSocket consumer for private chat messages.
+    Handles real-time private messaging between two users.
+    """
+
+    async def connect(self):
+        """
+        Called when a WebSocket connection is established.
+        """
+        self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
+        self.group_name = f"private_chat_{self.conversation_id}"
+        self.user = self.scope["user"]
+
+        # Sprawdzenie dostępu do konwersacji
+        has_access = await self.check_conversation_access()
+        if not has_access:
+            await self.close()
+            return
+
+        # Dodaj do grupy konwersacji
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        """
+        Called when a WebSocket connection is closed.
+        """
+        if hasattr(self, "group_name"):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        """
+        Called when a message is received from the WebSocket.
+        """
+        try:
+            data = json.loads(text_data)
+            message_type = data.get("type")
+
+            if message_type == "chat_message":
+                content = data.get("message", "").strip()
+                if content:
+                    # Zapisz wiadomość do bazy danych
+                    message = await self.save_message(content)
+                    if message:
+                        # Wyślij do grupy
+                        await self.channel_layer.group_send(
+                            self.group_name,
+                            {
+                                "type": "chat_message",
+                                "message": content,
+                                "username": self.user.username,
+                                "user_id": self.user.id,
+                                "timestamp": message.created_at.isoformat(),
+                                "message_id": message.id,
+                            },
+                        )
+        except json.JSONDecodeError:
+            pass
+
+    async def chat_message(self, event):
+        """
+        Receive a chat message from the group and send it to the WebSocket.
+        """
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "chat_message",
+                    "message": event["message"],
+                    "username": event["username"],
+                    "user_id": event["user_id"],
+                    "timestamp": event["timestamp"],
+                    "message_id": event["message_id"],
+                }
+            )
+        )
+
+    @database_sync_to_async
+    def check_conversation_access(self):
+        """
+        Check if the user has access to the private conversation.
+        """
+        try:
+            conversation = PrivateConversation.objects.get(id=self.conversation_id)
+            return (self.user == conversation.participant1 or 
+                    self.user == conversation.participant2)
+        except PrivateConversation.DoesNotExist:
+            return False
+
+    @database_sync_to_async
+    def save_message(self, content):
+        """
+        Save a private message to the database.
+        """
+        try:
+            conversation = PrivateConversation.objects.get(id=self.conversation_id)
+            message = PrivateMessage.objects.create(
+                conversation=conversation,
+                sender=self.user,
+                content=content
+            )
+            return message
+        except PrivateConversation.DoesNotExist:
+            return None

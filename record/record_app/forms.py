@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
-from .models import Channel, Message
+from .models import Channel, Message, PrivateMessage
 
 User = get_user_model()
 
@@ -140,3 +140,58 @@ class MessageForm(forms.ModelForm):
         if not content or not content.strip():
             raise forms.ValidationError("Wiadomość nie może być pusta.")
         return content
+
+
+class PrivateMessageForm(forms.ModelForm):
+    class Meta:
+        model = PrivateMessage
+        fields = ('content',)
+        widgets = {
+            'content': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Napisz wiadomość prywatną...',
+                'rows': 2
+            })
+        }
+    
+    def clean_content(self):
+        content = self.cleaned_data.get('content')
+        if not content or not content.strip():
+            raise forms.ValidationError("Wiadomość nie może być pusta.")
+        return content
+
+
+class StartPrivateConversationForm(forms.Form):
+    username = forms.CharField(
+        label='Wybierz użytkownika',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'list': 'user-options',
+            'autocomplete': 'off',
+            'placeholder': 'Wpisz nazwę użytkownika'
+        })
+    )
+    
+    def __init__(self, *args, current_user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if current_user:
+            self.user_queryset = User.objects.exclude(id=current_user.id)
+        else:
+            self.user_queryset = User.objects.all()
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if not username or not username.strip():
+            raise forms.ValidationError("Wybierz użytkownika.")
+
+        try:
+            return self.user_queryset.get(username=username.strip())
+        except User.DoesNotExist:
+            raise forms.ValidationError("Nie znaleziono użytkownika o takiej nazwie.")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        user = cleaned_data.get('username')
+        if user:
+            cleaned_data['user'] = user
+        return cleaned_data

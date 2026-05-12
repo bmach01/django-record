@@ -11,4 +11,8 @@ urlpatterns = [
     path('channel/<int:channel_id>/delete/', views.delete_channel_view, name='delete_channel'),
     path('channel/<int:channel_id>/message/', views.send_message_view, name='send_message'),
     path('channel/<int:channel_id>/invite/', views.invite_to_channel_view, name='invite_channel'),
+    # Prywatne wiadomości
+    path('private/', views.private_conversations_view, name='private_conversations'),
+    path('private/<int:conversation_id>/', views.private_chat_view, name='private_chat'),
+    path('private/start/', views.start_private_conversation_view, name='start_private_conversation'),
 ]

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Channel, Message, ChannelMembership
+from .models import User, Channel, Message, ChannelMembership, PrivateConversation, PrivateMessage
 
 
 @admin.register(User)
@@ -48,3 +48,27 @@ class ChannelMembershipAdmin(admin.ModelAdmin):
     list_filter = ('channel', 'added_at')
     search_fields = ('user__username', 'channel__name')
     readonly_fields = ('added_at',)
+
+
+@admin.register(PrivateConversation)
+class PrivateConversationAdmin(admin.ModelAdmin):
+    list_display = ('participant1', 'participant2', 'created_at', 'updated_at')
+    list_filter = ('created_at', 'updated_at')
+    search_fields = ('participant1__username', 'participant2__username')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related('participant1', 'participant2')
+
+
+@admin.register(PrivateMessage)
+class PrivateMessageAdmin(admin.ModelAdmin):
+    list_display = ('sender', 'conversation', 'created_at', 'content_preview')
+    list_filter = ('conversation', 'created_at', 'sender')
+    search_fields = ('content', 'sender__username', 'conversation__participant1__username', 'conversation__participant2__username')
+    readonly_fields = ('created_at',)
+    
+    def content_preview(self, obj):
+        return obj.content[:50] + '...' if len(obj.content) > 50 else obj.content
+    content_preview.short_description = 'Wiadomość'

@@ -1,0 +1,56 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/private_messages.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="record-wrapper">
+    <div class="private-container">
+        <a href="{% url 'home' %}" class="back-link">← Wróć do strony głównej</a>
+
+        <div class="private-header">
+            <h2>💬 Prywatne Wiadomości</h2>
+            <a href="{% url 'start_private_conversation' %}">➕ Nowa rozmowa</a>
+        </div>
+
+        {% if messages %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            {% for message in messages %}
+                <div>{{ message }}</div>
+            {% endfor %}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        {% endif %}
+
+        {% if conversations %}
+        <div class="conversations-list">
+            {% for conversation in conversations %}
+            <div class="conversation-item">
+                <div class="conversation-info">
+                    <div class="conversation-username">
+                        👤 {{ conversation.other_user.username }}
+                    </div>
+                    <div class="conversation-meta">
+                        Ostatnia wiadomość: {{ conversation.updated_at|timesince }} temu
+                    </div>
+                </div>
+                <a href="{% url 'private_chat' conversation.id %}" class="conversation-link">
+                    Otwórz →
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-message">
+            <p>Nie masz jeszcze żadnych prywatnych konwersacji.</p>
+            <a href="{% url 'start_private_conversation' %}">Rozpocznij nową rozmowę</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

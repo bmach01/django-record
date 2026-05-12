@@ -1,0 +1,131 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Czat Prywatny - Record{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+<link rel="stylesheet" href="{% static 'css/private_messages.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="private-chat-wrapper">
+    <!-- Header czatu prywatnego -->
+    <div class="private-chat-header">
+        <h3>💬 Rozmowa z {{ other_user.username }}</h3>
+        <a href="{% url 'private_conversations' %}" class="back-to-conversations">← Wróć do rozmów</a>
+    </div>
+
+    <!-- Obszar wiadomości -->
+    <div class="private-messages-area">
+        <div class="private-messages-container" id="messages-container">
+            {% if messages|length > 0 %}
+                {% for message in messages %}
+                <div class="private-message {% if message.sender == user %}own{% endif %}">
+                    <div class="message-wrapper">
+                        <div class="message-bubble">{{ message.content }}</div>
+                        <div class="message-time">{{ message.created_at|date:"H:i" }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="no-messages">
+                <p>Brak wiadomości. Rozpocznij rozmowę!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pole do wysyłania wiadomości -->
+    <div class="private-message-input-area">
+        <form method="POST" class="private-message-form">
+            {% csrf_token %}
+            {{ form.content }}
+            <button type="submit">Wyślij</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Przewiń do dołu gdy załaduje strona
+    const container = document.getElementById('messages-container');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // Automatyczne przewijanie gdy przychodzi nowa wiadomość (JavaScript WebSocket)
+    const ws = new WebSocket(
+        `ws://${window.location.host}/ws/private/{{ conversation.id }}/`
+    );
+
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'chat_message') {
+            addMessage(data);
+        }
+    };
+
+    ws.onerror = function(error) {
+        console.error('WebSocket error:', error);
+    };
+
+    function addMessage(data) {
+        const container = document.getElementById('messages-container');
+        const isOwnMessage = data.user_id === {{ user.id }};
+        
+        if (container.querySelector('.no-messages')) {
+            container.innerHTML = '';
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `private-message ${isOwnMessage ? 'own' : ''}`;
+        messageDiv.innerHTML = `
+            <div class="message-wrapper">
+                <div class="message-bubble">${escapeHtml(data.message)}</div>
+                <div class="message-time">${new Date(data.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}</div>
+            </div>
+        `;
+        
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Wyślij wiadomość po Enter lub Ctrl+Enter oraz kliknięciu przycisku
+    const textarea = document.querySelector('textarea');
+    const form = document.querySelector('form');
+    
+    if (textarea && form) {
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                form.submit();
+                return;
+            }
+
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                form.submit();
+            }
+        });
+
+        // Auto-resize textarea
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+        });
+    }
+</script>
+{% endblock %}

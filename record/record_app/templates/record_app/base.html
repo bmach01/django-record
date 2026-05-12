@@ -16,6 +16,7 @@
         <div>
             {% if user.is_authenticated %}
                 <span>Zalogowany: <strong>{{ user.username }}</strong></span>
+                <a href="{% url 'private_conversations' %}">💬 Wiadomości</a>
                 <a href="{% url 'logout' %}">Wyloguj się</a>
             {% else %}
                 <a href="{% url 'login' %}">Logowanie</a>

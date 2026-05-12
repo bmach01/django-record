@@ -4,8 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.urls import reverse
-from .forms import LoginForm, RegisterForm, ChannelForm, MessageForm
-from .models import Channel, ChannelMembership, Message
+from .forms import LoginForm, RegisterForm, ChannelForm, MessageForm, PrivateMessageForm, StartPrivateConversationForm
+from .models import Channel, ChannelMembership, Message, PrivateConversation, PrivateMessage
 
 User = get_user_model()
 
@@ -237,3 +237,91 @@ def invite_to_channel_view(request, channel_id):
     
     context = {'channel': channel, 'users': users}
     return render(request, 'record_app/invite_channel.html', context)
+
+
+@login_required(login_url='login')
+def private_conversations_view(request):
+    """Wyświetla listę prywatnych konwersacji użytkownika."""
+    conversations = PrivateConversation.objects.filter(
+        Q(participant1=request.user) | Q(participant2=request.user)
+    ).order_by('-updated_at')
+    
+    # Dodaj drugiego uczestnika do każdej konwersacji
+    for conversation in conversations:
+        conversation.other_user = conversation.get_other_user(request.user)
+    
+    context = {
+        'conversations': conversations,
+    }
+    return render(request, 'record_app/private_conversations.html', context)
+
+
+@login_required(login_url='login')
+def private_chat_view(request, conversation_id):
+    """Wyświetla prywatną konwersację i umożliwia wysyłanie wiadomości."""
+    conversation = get_object_or_404(PrivateConversation, id=conversation_id)
+    
+    # Sprawdzenie, czy użytkownik jest uczestnikiem rozmowy
+    if request.user not in [conversation.participant1, conversation.participant2]:
+        messages.error(request, "Nie masz dostępu do tej rozmowy.")
+        return redirect('private_conversations')
+    
+    # Pobierz drugiego uczestnika
+    other_user = conversation.get_other_user(request.user)
+    
+    # Pobierz wiadomości
+    private_messages = conversation.messages.all()[:50]
+    
+    # Obsługa wysyłania wiadomości
+    if request.method == 'POST':
+        form = PrivateMessageForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.conversation = conversation
+            message.sender = request.user
+            message.save()
+            conversation.save()  # Aktualizuj updated_at
+            messages.success(request, "Wiadomość wysłana.")
+            return redirect('private_chat', conversation_id=conversation.id)
+    else:
+        form = PrivateMessageForm()
+    
+    context = {
+        'conversation': conversation,
+        'other_user': other_user,
+        'messages': private_messages,
+        'form': form,
+    }
+    return render(request, 'record_app/private_chat.html', context)
+
+
+@login_required(login_url='login')
+def start_private_conversation_view(request):
+    """Pozwala użytkownikowi wybrać, z kim chce rozmawiać prywatnie."""
+    if request.method == 'POST':
+        form = StartPrivateConversationForm(request.POST, current_user=request.user)
+        if form.is_valid():
+            other_user = form.cleaned_data['user']
+            
+            # Sprawdzenie lub utworzenie konwersacji
+            # Upewnij się, że participant1 ma mniejszy id niż participant2 dla spójności
+            if request.user.id < other_user.id:
+                conversation, created = PrivateConversation.objects.get_or_create(
+                    participant1=request.user,
+                    participant2=other_user,
+                )
+            else:
+                conversation, created = PrivateConversation.objects.get_or_create(
+                    participant1=other_user,
+                    participant2=request.user,
+                )
+            
+            return redirect('private_chat', conversation_id=conversation.id)
+    else:
+        form = StartPrivateConversationForm(current_user=request.user)
+    
+    context = {
+        'form': form,
+        'users': form.user_queryset,
+    }
+    return render(request, 'record_app/start_private_conversation.html', context)
