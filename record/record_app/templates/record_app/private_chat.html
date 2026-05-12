@@ -39,11 +39,14 @@
 
     <!-- Pole do wysyłania wiadomości -->
     <div class="private-message-input-area">
-        <form method="POST" class="private-message-form">
-            {% csrf_token %}
-            {{ form.content }}
-            <button type="submit">Wyślij</button>
-        </form>
+        <div class="private-message-form">
+            <textarea 
+                id="message-input" 
+                placeholder="Wpisz wiadomość..." 
+                class="message-textarea"
+                maxlength="5000"></textarea>
+            <button type="button" id="send-btn">Wyślij</button>
+        </div>
     </div>
 </div>
 
@@ -54,10 +57,14 @@
         container.scrollTop = container.scrollHeight;
     }
 
-    // Automatyczne przewijanie gdy przychodzi nowa wiadomość (JavaScript WebSocket)
+    // Ustawienie WebSocket
     const ws = new WebSocket(
         `ws://${window.location.host}/ws/private/{{ conversation.id }}/`
     );
+
+    ws.onopen = function(event) {
+        console.log('WebSocket connection established');
+    };
 
     ws.onmessage = function(event) {
         const data = JSON.parse(event.data);
@@ -69,6 +76,10 @@
 
     ws.onerror = function(error) {
         console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = function(event) {
+        console.log('WebSocket connection closed');
     };
 
     function addMessage(data) {
@@ -103,21 +114,37 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    // Wyślij wiadomość po Enter lub Ctrl+Enter oraz kliknięciu przycisku
-    const textarea = document.querySelector('textarea');
-    const form = document.querySelector('form');
+    function sendMessage() {
+        const textarea = document.getElementById('message-input');
+        const message = textarea.value.trim();
+        
+        if (message) {
+            // Wyślij wiadomość przez WebSocket
+            ws.send(JSON.stringify({
+                'type': 'chat_message',
+                'message': message
+            }));
+            
+            // Wyczyść pole tekstowe
+            textarea.value = '';
+            textarea.style.height = 'auto';
+        }
+    }
+
+    // Event listenery
+    const textarea = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
     
-    if (textarea && form) {
+    // Wyślij po kliknięciu przycisku
+    sendBtn.addEventListener('click', sendMessage);
+    
+    // Wyślij po Enter (ale nie Shift+Enter)
+    if (textarea) {
         textarea.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                form.submit();
+                sendMessage();
                 return;
-            }
-
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                e.preventDefault();
-                form.submit();
             }
         });
 

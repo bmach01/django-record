@@ -258,7 +258,7 @@ def private_conversations_view(request):
 
 @login_required(login_url='login')
 def private_chat_view(request, conversation_id):
-    """Wyświetla prywatną konwersację i umożliwia wysyłanie wiadomości."""
+    """Wyświetla prywatną konwersację i umożliwia wysyłanie wiadomości przez WebSocket."""
     conversation = get_object_or_404(PrivateConversation, id=conversation_id)
     
     # Sprawdzenie, czy użytkownik jest uczestnikiem rozmowy
@@ -269,28 +269,13 @@ def private_chat_view(request, conversation_id):
     # Pobierz drugiego uczestnika
     other_user = conversation.get_other_user(request.user)
     
-    # Pobierz wiadomości
+    # Pobierz wiadomości (ostatnie 50)
     private_messages = conversation.messages.all()[:50]
-    
-    # Obsługa wysyłania wiadomości
-    if request.method == 'POST':
-        form = PrivateMessageForm(request.POST)
-        if form.is_valid():
-            message = form.save(commit=False)
-            message.conversation = conversation
-            message.sender = request.user
-            message.save()
-            conversation.save()  # Aktualizuj updated_at
-            messages.success(request, "Wiadomość wysłana.")
-            return redirect('private_chat', conversation_id=conversation.id)
-    else:
-        form = PrivateMessageForm()
     
     context = {
         'conversation': conversation,
         'other_user': other_user,
         'messages': private_messages,
-        'form': form,
     }
     return render(request, 'record_app/private_chat.html', context)
 

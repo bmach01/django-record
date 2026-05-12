@@ -340,7 +340,7 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def save_message(self, content):
         """
-        Save a private message to the database.
+        Save a private message to the database and update conversation timestamp.
         """
         try:
             conversation = PrivateConversation.objects.get(id=self.conversation_id)
@@ -349,6 +349,8 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
                 sender=self.user,
                 content=content
             )
+            # Aktualizuj timestamp konwersacji
+            conversation.save(update_fields=['updated_at'])
             return message
         except PrivateConversation.DoesNotExist:
             return None
