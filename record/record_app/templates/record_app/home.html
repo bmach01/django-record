@@ -52,6 +52,109 @@
             transform: translateY(0);
         }
     }
+
+    /* Lightbox styles */
+    .lightbox {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        animation: fadeIn 0.3s ease;
+    }
+
+    .lightbox.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .lightbox-content {
+        max-width: 90vw;
+        max-height: 90vh;
+        position: relative;
+    }
+
+    .lightbox-content img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .lightbox-close {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.3s;
+    }
+
+    .lightbox-close:hover {
+        color: #bbb;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* Image preview styles */
+    .image-preview-container {
+        position: relative;
+        display: inline-block;
+        margin: 5px 0;
+    }
+
+    .image-preview {
+        max-width: 200px;
+        max-height: 150px;
+        border-radius: 8px;
+        border: 2px dashed #28a745;
+    }
+
+    .image-preview-remove {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: #dc3545;
+        color: white;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        border: none;
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s;
+    }
+
+    .image-preview-remove:hover {
+        background: #c82333;
+    }
+
+    /* Image button highlight */
+    .image-btn-active {
+        background-color: #28a745 !important;
+        color: white !important;
+    }
+
+    .message-image img {
+        cursor: pointer;
+        transition: transform 0.2s, filter 0.2s;
+    }
+
+    .message-image img:hover {
+        transform: scale(1.02);
+        filter: brightness(1.1);
+    }
 </style>
 {% endblock %}
 
@@ -174,6 +277,11 @@
                                 <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
                             </div>
                             <div class="message-content">{{ message.content }}</div>
+                            {% if message.image %}
+                            <div class="message-image">
+                                <img src="{{ message.image.url }}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px;">
+                            </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     {% else %}
@@ -187,23 +295,45 @@
             <!-- Pole do wysyłania wiadomości -->
             {% if selected_channel.channel_type == 'text' %}
             <div class="message-input-area">
-                <form id="message-form" class="message-form">
-                    {% csrf_token %}
-                    <input type="text" 
-                           id="message-input"
-                           name="content" 
-                           class="form-control" 
-                           placeholder="Napisz wiadomość..." 
-                           required
-                           autocomplete="off">
-                    <button class="btn btn-primary" type="submit">Wyślij</button>
-                </form>
+                <div class="message-form" id="message-form-wrapper">
+                    <!-- Preview wybranego obrazka -->
+                    <div id="image-preview-wrapper" style="display: none; margin-bottom: 10px;">
+                        <div class="image-preview-container">
+                            <img id="image-preview-img" src="" alt="Preview" class="image-preview">
+                            <button type="button" class="image-preview-remove" id="image-preview-remove">✕</button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <input type="text" 
+                               id="message-input"
+                               name="content" 
+                               class="form-control" 
+                               placeholder="Napisz wiadomość..." 
+                               autocomplete="off"
+                               style="flex: 1;">
+                        <input type="file" 
+                               id="image-input"
+                               accept="image/*"
+                               style="display: none;">
+                        <button type="button" id="image-btn" class="btn btn-secondary" title="Dodaj obrazek">🖼️</button>
+                        <button type="button" id="send-btn" class="btn btn-primary">Wyślij</button>
+                    </div>
+                </div>
             </div>
             {% else %}
             <div class="message-input-area voice-notice">
                 <p>🔊 To jest kanał głosowy. Funkcja audio wkrótce.</p>
             </div>
             {% endif %}
+
+            <!-- Lightbox do powiększenia obrazków -->
+            <div id="lightbox" class="lightbox">
+                <div class="lightbox-content">
+                    <span class="lightbox-close">&times;</span>
+                    <img id="lightbox-img" src="" alt="Powiększony obrazek">
+                </div>
+            </div>
 
             {% else %}
             <!-- Brak wybranego kanału -->
@@ -355,15 +485,36 @@
             minute: '2-digit'
         });
 
-        messageDiv.innerHTML = `
+        let contentHTML = `
             <div class="message-header">
                 <strong class="message-author">${escapeHtml(data.username)}</strong>
                 <span class="message-time">${timestamp}</span>
             </div>
-            <div class="message-content">${escapeHtml(data.message)}</div>
         `;
+        
+        // Dodaj wiadomość tekstową tylko jeśli nie jest pusta
+        if (data.message) {
+            contentHTML += `<div class="message-content">${escapeHtml(data.message)}</div>`;
+        }
+        
+        // Dodaj obrazek jeśli istnieje
+        if (data.image_url) {
+            contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px; cursor: pointer;" data-image-url="${data.image_url}"></div>`;
+        }
 
+        messageDiv.innerHTML = contentHTML;
         container.appendChild(messageDiv);
+        
+        // Dodaj event listener do obrazków
+        const img = messageDiv.querySelector('.message-image img');
+        if (img) {
+            img.addEventListener('click', function() {
+                const lightbox = document.getElementById('lightbox');
+                const lightboxImg = document.getElementById('lightbox-img');
+                lightboxImg.src = this.src;
+                lightbox.classList.add('active');
+            });
+        }
 
         // Scroll do ostatniej wiadomości
         container.scrollTop = container.scrollHeight;
@@ -390,18 +541,27 @@
     }
 
     // Wysłanie wiadomości
-    function sendMessage(message) {
+    function sendMessage(message, imageData = null) {
         if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
-            // Fallback do formularza HTML jeśli WebSocket nie jest dostępny
-            console.warn('WebSocket nie jest dostępny. Używam formularza.');
-            return false; // Zezwól na tradycyjne wysłanie
+            console.warn('WebSocket nie jest dostępny.');
+            return false;
         }
 
-        if (message.trim()) {
-            chatSocket.send(JSON.stringify({
+        if (message.trim() || imageData) {
+            const payload = {
                 type: 'chat_message',
-                message: message,
-            }));
+            };
+            
+            // Dodaj wiadomość tylko jeśli nie jest pusta
+            if (message.trim()) {
+                payload.message = message.trim();
+            }
+            
+            if (imageData) {
+                payload.image = imageData;
+            }
+            
+            chatSocket.send(JSON.stringify(payload));
             return true;
         }
 
@@ -422,22 +582,118 @@
 
     // Event listener dla formularza wiadomości
     document.addEventListener('DOMContentLoaded', () => {
-        const messageForm = document.getElementById('message-form');
-        if (messageForm) {
-            messageForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const input = document.getElementById('message-input');
-                const message = input.value;
-
-                if (sendMessage(message) === false) {
-                    // WebSocket nie zadziałał, wysłanie za pośrednictwem tradycyjnego POST
-                    messageForm.submit();
-                } else {
-                    input.value = '';
-                    input.focus();
+        const messageInput = document.getElementById('message-input');
+        const imageInput = document.getElementById('image-input');
+        const imageBtn = document.getElementById('image-btn');
+        const sendBtn = document.getElementById('send-btn');
+        const imagePreviewWrapper = document.getElementById('image-preview-wrapper');
+        const imagePreviewImg = document.getElementById('image-preview-img');
+        const imagePreviewRemove = document.getElementById('image-preview-remove');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxClose = document.querySelector('.lightbox-close');
+        
+        let selectedImageData = null;
+        
+        // Obsługi przycisku do wyboru obrazka
+        if (imageBtn) {
+            imageBtn.addEventListener('click', () => {
+                imageInput.click();
+            });
+        }
+        
+        // Obsługa wybrania obrazka
+        if (imageInput) {
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        selectedImageData = event.target.result; // base64 encoded
+                        imageBtn.classList.add('image-btn-active');
+                        
+                        // Pokaż preview
+                        imagePreviewImg.src = event.target.result;
+                        imagePreviewWrapper.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
                 }
             });
         }
+        
+        // Obsługa usunięcia wybranego obrazka
+        if (imagePreviewRemove) {
+            imagePreviewRemove.addEventListener('click', () => {
+                selectedImageData = null;
+                imageBtn.classList.remove('image-btn-active');
+                imagePreviewWrapper.style.display = 'none';
+                imageInput.value = '';
+            });
+        }
+        
+        // Obsługa wysyłania wiadomości
+        if (sendBtn) {
+            sendBtn.addEventListener('click', () => {
+                const message = messageInput.value;
+                if (sendMessage(message, selectedImageData)) {
+                    messageInput.value = '';
+                    messageInput.focus();
+                    selectedImageData = null;
+                    imageBtn.classList.remove('image-btn-active');
+                    imagePreviewWrapper.style.display = 'none';
+                    imageInput.value = '';
+                }
+            });
+        }
+        
+        // Enter do wysyłania (bez Shift)
+        if (messageInput) {
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const message = messageInput.value;
+                    if (sendMessage(message, selectedImageData)) {
+                        messageInput.value = '';
+                        messageInput.focus();
+                        selectedImageData = null;
+                        imageBtn.classList.remove('image-btn-active');
+                        imagePreviewWrapper.style.display = 'none';
+                        imageInput.value = '';
+                    }
+                }
+            });
+        }
+        
+        // Obsługa lightboxa
+        if (lightboxClose) {
+            lightboxClose.addEventListener('click', () => {
+                lightbox.classList.remove('active');
+            });
+        }
+        
+        if (lightbox) {
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox) {
+                    lightbox.classList.remove('active');
+                }
+            });
+        }
+        
+        // Dodaj event listenery do obrazków już wyświetlonych
+        function addLightboxToImages() {
+            const images = document.querySelectorAll('.message-image img');
+            images.forEach(img => {
+                img.removeEventListener('click', openLightbox);
+                img.addEventListener('click', openLightbox);
+            });
+        }
+        
+        function openLightbox(e) {
+            const lightboxImg = document.getElementById('lightbox-img');
+            lightboxImg.src = e.target.src;
+            lightbox.classList.add('active');
+        }
+        
+        addLightboxToImages();
 
         // Inicjalizuj WebSockety
         initChatSocket();

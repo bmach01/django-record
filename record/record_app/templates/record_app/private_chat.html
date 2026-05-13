@@ -5,8 +5,8 @@
 {% block title %}Czat Prywatny - Record{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/home.css' %}">
-<link rel="stylesheet" href="{% static 'css/private_messages.css' %}">
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+<link rel="stylesheet" href="{% static 'css/private_chat.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -25,6 +25,11 @@
                 <div class="private-message {% if message.sender == user %}own{% endif %}">
                     <div class="message-wrapper">
                         <div class="message-bubble">{{ message.content }}</div>
+                        {% if message.image %}
+                        <div class="message-image">
+                            <img src="{{ message.image.url }}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px;">
+                        </div>
+                        {% endif %}
                         <div class="message-time">{{ message.created_at|date:"H:i" }}</div>
                     </div>
                 </div>
@@ -40,12 +45,36 @@
     <!-- Pole do wysyłania wiadomości -->
     <div class="private-message-input-area">
         <div class="private-message-form">
-            <textarea 
-                id="message-input" 
-                placeholder="Wpisz wiadomość..." 
-                class="message-textarea"
-                maxlength="5000"></textarea>
-            <button type="button" id="send-btn">Wyślij</button>
+            <!-- Preview wybranego obrazka -->
+            <div id="image-preview-wrapper">
+                <div class="image-preview-container">
+                    <img id="image-preview-img" src="" alt="Preview" class="image-preview">
+                    <button type="button" class="image-preview-remove" id="image-preview-remove">✕</button>
+                </div>
+            </div>
+            
+            <div>
+                <textarea 
+                    id="message-input" 
+                    placeholder="Wpisz wiadomość..." 
+                    class="message-textarea"
+                    maxlength="5000"></textarea>
+                <input type="file" 
+                       id="image-input"
+                       accept="image/*">
+                <div class="btn-container">
+                    <button type="button" id="image-btn" class="btn btn-secondary" title="Dodaj obrazek">🖼️</button>
+                    <button type="button" id="send-btn">Wyślij</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox do powiększenia obrazków -->
+    <div id="lightbox" class="lightbox">
+        <div class="lightbox-content">
+            <span class="lightbox-close">&times;</span>
+            <img id="lightbox-img" src="" alt="Powiększony obrazek">
         </div>
     </div>
 </div>
@@ -92,14 +121,39 @@
 
         const messageDiv = document.createElement('div');
         messageDiv.className = `private-message ${isOwnMessage ? 'own' : ''}`;
-        messageDiv.innerHTML = `
+        
+        let contentHTML = `
             <div class="message-wrapper">
-                <div class="message-bubble">${escapeHtml(data.message)}</div>
-                <div class="message-time">${new Date(data.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}</div>
+        `;
+        
+        // Dodaj wiadomość tekstową tylko jeśli nie jest pusta
+        if (data.message) {
+            contentHTML += `<div class="message-bubble">${escapeHtml(data.message)}</div>`;
+        }
+        
+        // Dodaj obrazek jeśli istnieje
+        if (data.image_url) {
+            contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px; cursor: pointer;" data-image-url="${data.image_url}"></div>`;
+        }
+        
+        contentHTML += `<div class="message-time">${new Date(data.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}</div>
             </div>
         `;
         
+        messageDiv.innerHTML = contentHTML;
         container.appendChild(messageDiv);
+        
+        // Dodaj event listener do obrazku
+        const img = messageDiv.querySelector('.message-image img');
+        if (img) {
+            img.addEventListener('click', function() {
+                const lightbox = document.getElementById('lightbox');
+                const lightboxImg = document.getElementById('lightbox-img');
+                lightboxImg.src = this.src;
+                lightbox.classList.add('active');
+            });
+        }
+        
         container.scrollTop = container.scrollHeight;
     }
 
@@ -114,36 +168,141 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    function sendMessage() {
+    function sendMessage(imageData = null) {
         const textarea = document.getElementById('message-input');
         const message = textarea.value.trim();
         
-        if (message) {
-            // Wyślij wiadomość przez WebSocket
-            ws.send(JSON.stringify({
+        if (message || imageData) {
+            const payload = {
                 'type': 'chat_message',
-                'message': message
-            }));
+            };
+            
+            // Dodaj wiadomość tylko jeśli nie jest pusta
+            if (message) {
+                payload.message = message;
+            }
+            
+            if (imageData) {
+                payload.image = imageData;
+            }
+            
+            // Wyślij wiadomość przez WebSocket
+            ws.send(JSON.stringify(payload));
             
             // Wyczyść pole tekstowe
             textarea.value = '';
             textarea.style.height = 'auto';
+            
+            return true;
         }
+        
+        return false;
     }
 
     // Event listenery
     const textarea = document.getElementById('message-input');
+    const imageInput = document.getElementById('image-input');
+    const imageBtn = document.getElementById('image-btn');
     const sendBtn = document.getElementById('send-btn');
+    const imagePreviewWrapper = document.getElementById('image-preview-wrapper');
+    const imagePreviewImg = document.getElementById('image-preview-img');
+    const imagePreviewRemove = document.getElementById('image-preview-remove');
+    const lightbox = document.getElementById('lightbox');
+    const lightboxClose = document.querySelector('.lightbox-close');
     
-    // Wyślij po kliknięciu przycisku
-    sendBtn.addEventListener('click', sendMessage);
+    let selectedImageData = null;
     
-    // Wyślij po Enter (ale nie Shift+Enter)
+    // Obsługi przycisku do wyboru obrazka
+    if (imageBtn) {
+        imageBtn.addEventListener('click', () => {
+            imageInput.click();
+        });
+    }
+    
+    // Obsługa wybrania obrazka
+    if (imageInput) {
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    selectedImageData = event.target.result; // base64 encoded
+                    imageBtn.classList.add('image-btn-active');
+                    
+                    // Pokaż preview
+                    imagePreviewImg.src = event.target.result;
+                    imagePreviewWrapper.classList.add('active');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
+    // Obsługa usunięcia wybranego obrazka
+    if (imagePreviewRemove) {
+        imagePreviewRemove.addEventListener('click', () => {
+            selectedImageData = null;
+            imageBtn.classList.remove('image-btn-active');
+            imagePreviewWrapper.classList.remove('active');
+            imageInput.value = '';
+        });
+    }
+    
+    // Obsługa wysyłania wiadomości
+    if (sendBtn) {
+        sendBtn.addEventListener('click', () => {
+            if (sendMessage(selectedImageData)) {
+                selectedImageData = null;
+                imageBtn.classList.remove('image-btn-active');
+                imagePreviewWrapper.classList.remove('active');
+                imageInput.value = '';
+            }
+        });
+    }
+    
+    // Obsługa lightboxa
+    if (lightboxClose) {
+        lightboxClose.addEventListener('click', () => {
+            lightbox.classList.remove('active');
+        });
+    }
+    
+    if (lightbox) {
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) {
+                lightbox.classList.remove('active');
+            }
+        });
+    }
+    
+    // Dodaj event listenery do obrazków już wyświetlonych
+    function addLightboxToImages() {
+        const images = document.querySelectorAll('.message-image img');
+        images.forEach(img => {
+            img.removeEventListener('click', openLightbox);
+            img.addEventListener('click', openLightbox);
+        });
+    }
+    
+    function openLightbox(e) {
+        const lightboxImg = document.getElementById('lightbox-img');
+        lightboxImg.src = e.target.src;
+        lightbox.classList.add('active');
+    }
+    
+    addLightboxToImages();
+    
+    // Enter do wysyłania (Shift+Enter na nową linię)
     if (textarea) {
         textarea.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                if (sendMessage(selectedImageData)) {
+                    selectedImageData = null;
+                    imageBtn.classList.remove('image-btn-active');
+                    imagePreviewWrapper.classList.remove('active');
+                    imageInput.value = '';
+                }
                 return;
             }
         });

@@ -1,7 +1,10 @@
 import json
+import base64
+from io import BytesIO
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
+from django.core.files.base import ContentFile
 from .models import Channel, Message, ChannelMembership, PrivateConversation, PrivateMessage
 
 
@@ -69,21 +72,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             if message_type == "chat_message":
                 content = data.get("message", "").strip()
-                if content:
+                image_data = data.get("image")  # base64 encoded image
+                
+                if content or image_data:
                     # Zapisz wiadomość do bazy danych
-                    message = await self.save_message(content)
+                    message = await self.save_message(content, image_data)
                     if message:
+                        # Przygotuj dane do wysłania
+                        broadcast_data = {
+                            "type": "chat_message",
+                            "message": content,
+                            "username": self.user.username,
+                            "user_id": self.user.id,
+                            "timestamp": message.created_at.isoformat(),
+                            "message_id": message.id,
+                        }
+                        
+                        # Jeśli jest obrazek, dodaj jego URL
+                        if message.image:
+                            broadcast_data["image_url"] = message.image.url
+                        
                         # Wyślij do grupy
                         await self.channel_layer.group_send(
                             self.channel_group_name,
-                            {
-                                "type": "chat_message",
-                                "message": content,
-                                "username": self.user.username,
-                                "user_id": self.user.id,
-                                "timestamp": message.created_at.isoformat(),
-                                "message_id": message.id,
-                            },
+                            broadcast_data,
                         )
         except json.JSONDecodeError:
             pass
@@ -92,18 +104,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """
         Receive a chat message from the group and send it to the WebSocket.
         """
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "chat_message",
-                    "message": event["message"],
-                    "username": event["username"],
-                    "user_id": event["user_id"],
-                    "timestamp": event["timestamp"],
-                    "message_id": event["message_id"],
-                }
-            )
-        )
+        response_data = {
+            "type": "chat_message",
+            "message": event["message"],
+            "username": event["username"],
+            "user_id": event["user_id"],
+            "timestamp": event["timestamp"],
+            "message_id": event["message_id"],
+        }
+        
+        # Dodaj URL obrazka jeśli istnieje
+        if "image_url" in event:
+            response_data["image_url"] = event["image_url"]
+        
+        await self.send(text_data=json.dumps(response_data))
 
     async def user_joined(self, event):
         """
@@ -166,15 +180,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def save_message(self, content):
+    def save_message(self, content, image_data=None):
         """
-        Save a message to the database.
+        Save a message to the database with optional image.
+        image_data should be base64 encoded string in format: "data:image/jpeg;base64,..."
         """
         try:
             channel = Channel.objects.get(id=self.channel_id)
             message = Message.objects.create(
                 channel=channel, author=self.user, content=content
             )
+            
+            # Jeśli jest obrazek, zdekoduj i zapisz
+            if image_data:
+                try:
+                    # Rozdziel prefix (np. "data:image/jpeg;base64,") od danych
+                    if "," in image_data:
+                        header, data = image_data.split(",", 1)
+                        # Wyodrębnij typ MIME (np. image/jpeg)
+                        mime_type = header.split(":")[1].split(";")[0]
+                        extension = mime_type.split("/")[1]
+                    else:
+                        data = image_data
+                        extension = "png"
+                    
+                    # Zdekoduj base64
+                    image_bytes = base64.b64decode(data)
+                    
+                    # Zapisz do ImageField
+                    filename = f"message_{message.id}.{extension}"
+                    message.image.save(filename, ContentFile(image_bytes), save=True)
+                except Exception as e:
+                    print(f"Error saving image: {e}")
+            
             return message
         except Channel.DoesNotExist:
             return None
@@ -289,21 +327,30 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
 
             if message_type == "chat_message":
                 content = data.get("message", "").strip()
-                if content:
+                image_data = data.get("image")  # base64 encoded image
+                
+                if content or image_data:
                     # Zapisz wiadomość do bazy danych
-                    message = await self.save_message(content)
+                    message = await self.save_message(content, image_data)
                     if message:
+                        # Przygotuj dane do wysłania
+                        broadcast_data = {
+                            "type": "chat_message",
+                            "message": content,
+                            "username": self.user.username,
+                            "user_id": self.user.id,
+                            "timestamp": message.created_at.isoformat(),
+                            "message_id": message.id,
+                        }
+                        
+                        # Jeśli jest obrazek, dodaj jego URL
+                        if message.image:
+                            broadcast_data["image_url"] = message.image.url
+                        
                         # Wyślij do grupy
                         await self.channel_layer.group_send(
                             self.group_name,
-                            {
-                                "type": "chat_message",
-                                "message": content,
-                                "username": self.user.username,
-                                "user_id": self.user.id,
-                                "timestamp": message.created_at.isoformat(),
-                                "message_id": message.id,
-                            },
+                            broadcast_data,
                         )
         except json.JSONDecodeError:
             pass
@@ -312,18 +359,20 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
         """
         Receive a chat message from the group and send it to the WebSocket.
         """
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "chat_message",
-                    "message": event["message"],
-                    "username": event["username"],
-                    "user_id": event["user_id"],
-                    "timestamp": event["timestamp"],
-                    "message_id": event["message_id"],
-                }
-            )
-        )
+        response_data = {
+            "type": "chat_message",
+            "message": event["message"],
+            "username": event["username"],
+            "user_id": event["user_id"],
+            "timestamp": event["timestamp"],
+            "message_id": event["message_id"],
+        }
+        
+        # Dodaj URL obrazka jeśli istnieje
+        if "image_url" in event:
+            response_data["image_url"] = event["image_url"]
+        
+        await self.send(text_data=json.dumps(response_data))
 
     @database_sync_to_async
     def check_conversation_access(self):
@@ -338,9 +387,10 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def save_message(self, content):
+    def save_message(self, content, image_data=None):
         """
-        Save a private message to the database and update conversation timestamp.
+        Save a private message to the database with optional image and update conversation timestamp.
+        image_data should be base64 encoded string in format: "data:image/jpeg;base64,..."
         """
         try:
             conversation = PrivateConversation.objects.get(id=self.conversation_id)
@@ -349,6 +399,29 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
                 sender=self.user,
                 content=content
             )
+            
+            # Jeśli jest obrazek, zdekoduj i zapisz
+            if image_data:
+                try:
+                    # Rozdziel prefix (np. "data:image/jpeg;base64,") od danych
+                    if "," in image_data:
+                        header, data = image_data.split(",", 1)
+                        # Wyodrębnij typ MIME (np. image/jpeg)
+                        mime_type = header.split(":")[1].split(";")[0]
+                        extension = mime_type.split("/")[1]
+                    else:
+                        data = image_data
+                        extension = "png"
+                    
+                    # Zdekoduj base64
+                    image_bytes = base64.b64decode(data)
+                    
+                    # Zapisz do ImageField
+                    filename = f"private_message_{message.id}.{extension}"
+                    message.image.save(filename, ContentFile(image_bytes), save=True)
+                except Exception as e:
+                    print(f"Error saving image: {e}")
+            
             # Aktualizuj timestamp konwersacji
             conversation.save(update_fields=['updated_at'])
             return message
