@@ -73,10 +73,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if message_type == "chat_message":
                 content = data.get("message", "").strip()
                 image_data = data.get("image")  # base64 encoded image
+                audio_data = data.get("audio")  # base64 encoded audio
                 
-                if content or image_data:
+                if content or image_data or audio_data:
                     # Zapisz wiadomość do bazy danych
-                    message = await self.save_message(content, image_data)
+                    message = await self.save_message(content, image_data, audio_data)
                     if message:
                         # Przygotuj dane do wysłania
                         broadcast_data = {
@@ -91,6 +92,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         # Jeśli jest obrazek, dodaj jego URL
                         if message.image:
                             broadcast_data["image_url"] = message.image.url
+                        
+                        # Jeśli jest nagranie, dodaj jego URL
+                        if message.audio:
+                            broadcast_data["audio_url"] = message.audio.url
                         
                         # Wyślij do grupy
                         await self.channel_layer.group_send(
@@ -116,6 +121,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Dodaj URL obrazka jeśli istnieje
         if "image_url" in event:
             response_data["image_url"] = event["image_url"]
+        
+        # Dodaj URL nagrania jeśli istnieje
+        if "audio_url" in event:
+            response_data["audio_url"] = event["audio_url"]
         
         await self.send(text_data=json.dumps(response_data))
 
@@ -180,10 +189,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def save_message(self, content, image_data=None):
+    def save_message(self, content, image_data=None, audio_data=None):
         """
-        Save a message to the database with optional image.
+        Save a message to the database with optional image and audio.
         image_data should be base64 encoded string in format: "data:image/jpeg;base64,..."
+        audio_data should be base64 encoded string in format: "data:audio/webm;base64,..."
         """
         try:
             channel = Channel.objects.get(id=self.channel_id)
@@ -212,6 +222,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     message.image.save(filename, ContentFile(image_bytes), save=True)
                 except Exception as e:
                     print(f"Error saving image: {e}")
+            
+            # Jeśli jest nagranie, zdekoduj i zapisz
+            if audio_data:
+                try:
+                    # Rozdziel prefix (np. "data:audio/webm;base64,") od danych
+                    if "," in audio_data:
+                        header, data = audio_data.split(",", 1)
+                        # Wyodrębnij typ MIME (np. audio/webm)
+                        mime_type = header.split(":")[1].split(";")[0]
+                        extension = mime_type.split("/")[1]
+                    else:
+                        data = audio_data
+                        extension = "webm"
+                    
+                    # Zdekoduj base64
+                    audio_bytes = base64.b64decode(data)
+                    
+                    # Zapisz do FileField
+                    filename = f"message_{message.id}.{extension}"
+                    message.audio.save(filename, ContentFile(audio_bytes), save=True)
+                except Exception as e:
+                    print(f"Error saving audio: {e}")
             
             return message
         except Channel.DoesNotExist:
@@ -328,10 +360,11 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             if message_type == "chat_message":
                 content = data.get("message", "").strip()
                 image_data = data.get("image")  # base64 encoded image
+                audio_data = data.get("audio")  # base64 encoded audio
                 
-                if content or image_data:
+                if content or image_data or audio_data:
                     # Zapisz wiadomość do bazy danych
-                    message = await self.save_message(content, image_data)
+                    message = await self.save_message(content, image_data, audio_data)
                     if message:
                         # Przygotuj dane do wysłania
                         broadcast_data = {
@@ -346,6 +379,10 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
                         # Jeśli jest obrazek, dodaj jego URL
                         if message.image:
                             broadcast_data["image_url"] = message.image.url
+                        
+                        # Jeśli jest nagranie, dodaj jego URL
+                        if message.audio:
+                            broadcast_data["audio_url"] = message.audio.url
                         
                         # Wyślij do grupy
                         await self.channel_layer.group_send(
@@ -372,6 +409,10 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
         if "image_url" in event:
             response_data["image_url"] = event["image_url"]
         
+        # Dodaj URL nagrania jeśli istnieje
+        if "audio_url" in event:
+            response_data["audio_url"] = event["audio_url"]
+        
         await self.send(text_data=json.dumps(response_data))
 
     @database_sync_to_async
@@ -387,10 +428,11 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             return False
 
     @database_sync_to_async
-    def save_message(self, content, image_data=None):
+    def save_message(self, content, image_data=None, audio_data=None):
         """
-        Save a private message to the database with optional image and update conversation timestamp.
+        Save a private message to the database with optional image, audio and update conversation timestamp.
         image_data should be base64 encoded string in format: "data:image/jpeg;base64,..."
+        audio_data should be base64 encoded string in format: "data:audio/webm;base64,..."
         """
         try:
             conversation = PrivateConversation.objects.get(id=self.conversation_id)
@@ -421,6 +463,28 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
                     message.image.save(filename, ContentFile(image_bytes), save=True)
                 except Exception as e:
                     print(f"Error saving image: {e}")
+            
+            # Jeśli jest nagranie, zdekoduj i zapisz
+            if audio_data:
+                try:
+                    # Rozdziel prefix (np. "data:audio/webm;base64,") od danych
+                    if "," in audio_data:
+                        header, data = audio_data.split(",", 1)
+                        # Wyodrębnij typ MIME (np. audio/webm)
+                        mime_type = header.split(":")[1].split(";")[0]
+                        extension = mime_type.split("/")[1]
+                    else:
+                        data = audio_data
+                        extension = "webm"
+                    
+                    # Zdekoduj base64
+                    audio_bytes = base64.b64decode(data)
+                    
+                    # Zapisz do FileField
+                    filename = f"private_message_{message.id}.{extension}"
+                    message.audio.save(filename, ContentFile(audio_bytes), save=True)
+                except Exception as e:
+                    print(f"Error saving audio: {e}")
             
             # Aktualizuj timestamp konwersacji
             conversation.save(update_fields=['updated_at'])

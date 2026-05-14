@@ -70,6 +70,7 @@ class Message(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='messages')
     content = models.TextField()
     image = models.ImageField(upload_to='messages/', blank=True, null=True)
+    audio = models.FileField(upload_to='messages_audio/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -115,6 +116,7 @@ class PrivateMessage(models.Model):
     conversation = models.ForeignKey(PrivateConversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_private_messages')
     image = models.ImageField(upload_to='private_messages/', blank=True, null=True)
+    audio = models.FileField(upload_to='private_messages_audio/', blank=True, null=True)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     

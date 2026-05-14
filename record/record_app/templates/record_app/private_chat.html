@@ -24,13 +24,24 @@
                 {% for message in messages %}
                 <div class="private-message {% if message.sender == user %}own{% endif %}">
                     <div class="message-wrapper">
+                        {% if message.content %}
                         <div class="message-bubble">{{ message.content }}</div>
+                        {% endif %}
                         {% if message.image %}
                         <div class="message-image">
                             <img src="{{ message.image.url }}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px;">
                         </div>
                         {% endif %}
-                        <div class="message-time">{{ message.created_at|date:"H:i" }}</div>
+                        {% if message.audio %}
+                        <div class="message-audio">
+                            <audio controls class="voice-player">
+                                <source src="{{ message.audio.url }}" type="audio/webm">
+                                <source src="{{ message.audio.url }}" type="audio/mpeg">
+                                Twoja przeglądarka nie wspiera odtwarzacza audio
+                            </audio>
+                        </div>
+                        {% endif %}
+                        <div class="message-time">{{ message.created_at|localtime|date:"H:i" }}</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -53,6 +64,19 @@
                 </div>
             </div>
             
+            <!-- Recorder status -->
+            <div id="voice-recorder-status">
+                <div class="voice-recording-indicator">
+                    <span class="recording-dot"></span>
+                    <span id="voice-status-text">Nagrywanie...</span>
+                    <span id="voice-timer">0:00</span>
+                    <div class="voice-recording-actions">
+                        <button type="button" id="voice-record-stop" class="btn btn-secondary btn-sm">Zatrzymaj</button>
+                        <button type="button" id="voice-record-cancel" class="btn btn-secondary btn-sm">Anuluj</button>
+                    </div>
+                </div>
+            </div>
+            
             <div>
                 <textarea 
                     id="message-input" 
@@ -64,6 +88,7 @@
                        accept="image/*">
                 <div class="btn-container">
                     <button type="button" id="image-btn" class="btn btn-secondary" title="Dodaj obrazek">🖼️</button>
+                    <button type="button" id="voice-btn" class="btn btn-secondary" title="Nagraj wiadomość głosową">🎤</button>
                     <button type="button" id="send-btn">Wyślij</button>
                 </div>
             </div>
@@ -113,8 +138,8 @@
 
     function addMessage(data) {
         const container = document.getElementById('messages-container');
-        const isOwnMessage = data.user_id === {{ user.id }};
-        
+        const isOwnMessage = data.user_id === user.id;
+
         if (container.querySelector('.no-messages')) {
             container.innerHTML = '';
         }
@@ -134,6 +159,11 @@
         // Dodaj obrazek jeśli istnieje
         if (data.image_url) {
             contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px; cursor: pointer;" data-image-url="${data.image_url}"></div>`;
+        }
+        
+        // Dodaj nagranie jeśli istnieje
+        if (data.audio_url) {
+            contentHTML += `<div class="message-audio"><audio controls class="voice-player"><source src="${data.audio_url}" type="audio/webm"><source src="${data.audio_url}" type="audio/mpeg">Twoja przeglądarka nie wspiera odtwarzacza audio</audio></div>`;
         }
         
         contentHTML += `<div class="message-time">${new Date(data.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}</div>
@@ -168,11 +198,11 @@
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    function sendMessage(imageData = null) {
+    function sendMessage(imageData = null, audioData = null) {
         const textarea = document.getElementById('message-input');
         const message = textarea.value.trim();
         
-        if (message || imageData) {
+        if (message || imageData || audioData) {
             const payload = {
                 'type': 'chat_message',
             };
@@ -184,6 +214,10 @@
             
             if (imageData) {
                 payload.image = imageData;
+            }
+            
+            if (audioData) {
+                payload.audio = audioData;
             }
             
             // Wyślij wiadomość przez WebSocket
@@ -203,14 +237,118 @@
     const textarea = document.getElementById('message-input');
     const imageInput = document.getElementById('image-input');
     const imageBtn = document.getElementById('image-btn');
+    const voiceBtn = document.getElementById('voice-btn');
+    const voiceStatusText = document.getElementById('voice-status-text');
+    const voiceRecordStop = document.getElementById('voice-record-stop');
     const sendBtn = document.getElementById('send-btn');
     const imagePreviewWrapper = document.getElementById('image-preview-wrapper');
     const imagePreviewImg = document.getElementById('image-preview-img');
     const imagePreviewRemove = document.getElementById('image-preview-remove');
     const lightbox = document.getElementById('lightbox');
     const lightboxClose = document.querySelector('.lightbox-close');
+    const voiceRecorderStatus = document.getElementById('voice-recorder-status');
+    const voiceRecordCancel = document.getElementById('voice-record-cancel');
+    const voiceTimer = document.getElementById('voice-timer');
     
     let selectedImageData = null;
+    let selectedAudioData = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordingStartTime = null;
+    let timerInterval = null;
+    
+    // Voice recording function
+    async function startVoiceRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            recordingStartTime = Date.now();
+            
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    selectedAudioData = event.target.result;
+                    voiceBtn.classList.add('image-btn-active');
+                };
+                reader.readAsDataURL(audioBlob);
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            mediaRecorder.start();
+            voiceStatusText.textContent = 'Nagrywanie...';
+            voiceRecorderStatus.classList.add('active');
+            textarea.disabled = true;
+            sendBtn.disabled = true;
+            
+            // Update timer
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                voiceTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 100);
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+            alert('Nie można uzyskać dostępu do mikrofonu');
+        }
+    }
+    
+    function stopVoiceRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            voiceStatusText.textContent = 'Nagranie gotowe';
+            textarea.disabled = false;
+            sendBtn.disabled = false;
+            clearInterval(timerInterval);
+            voiceTimer.textContent = '0:00';
+        }
+    }
+    
+    // Voice button click handler
+    if (voiceBtn) {
+        voiceBtn.addEventListener('click', () => {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                startVoiceRecording();
+            } else {
+                stopVoiceRecording();
+            }
+        });
+    }
+    
+    // Cancel recording
+    if (voiceRecordCancel) {
+        voiceRecordCancel.addEventListener('click', () => {
+            if (mediaRecorder) {
+                mediaRecorder.state !== 'inactive' && mediaRecorder.stop();
+                // Stop all tracks
+                const stream = mediaRecorder.stream;
+                if (stream) stream.getTracks().forEach(track => track.stop());
+                mediaRecorder = null;
+            }
+            selectedAudioData = null;
+            voiceBtn.classList.remove('image-btn-active');
+            voiceStatusText.textContent = 'Nagrywanie...';
+            voiceRecorderStatus.classList.remove('active');
+            textarea.disabled = false;
+            sendBtn.disabled = false;
+            clearInterval(timerInterval);
+            voiceTimer.textContent = '0:00';
+        });
+    }
+    
+    if (voiceRecordStop) {
+        voiceRecordStop.addEventListener('click', () => {
+            stopVoiceRecording();
+        });
+    }
     
     // Obsługi przycisku do wyboru obrazka
     if (imageBtn) {
@@ -251,11 +389,19 @@
     // Obsługa wysyłania wiadomości
     if (sendBtn) {
         sendBtn.addEventListener('click', () => {
-            if (sendMessage(selectedImageData)) {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                alert('Najpierw zatrzymaj nagrywanie, aby wysłać wiadomość.');
+                return;
+            }
+            if (sendMessage(selectedImageData, selectedAudioData)) {
                 selectedImageData = null;
+                selectedAudioData = null;
                 imageBtn.classList.remove('image-btn-active');
+                voiceBtn.classList.remove('image-btn-active');
                 imagePreviewWrapper.classList.remove('active');
                 imageInput.value = '';
+                voiceRecorderStatus.classList.remove('active');
+                voiceStatusText.textContent = 'Nagrywanie...';
             }
         });
     }
@@ -297,11 +443,19 @@
         textarea.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (sendMessage(selectedImageData)) {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    alert('Najpierw zatrzymaj nagrywanie, aby wysłać wiadomość.');
+                    return;
+                }
+                if (sendMessage(selectedImageData, selectedAudioData)) {
                     selectedImageData = null;
+                    selectedAudioData = null;
                     imageBtn.classList.remove('image-btn-active');
+                    voiceBtn.classList.remove('image-btn-active');
                     imagePreviewWrapper.classList.remove('active');
                     imageInput.value = '';
+                    voiceRecorderStatus.classList.remove('active');
+                    voiceStatusText.textContent = 'Nagrywanie...';
                 }
                 return;
             }

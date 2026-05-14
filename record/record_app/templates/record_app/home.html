@@ -276,10 +276,21 @@
                                 <strong class="message-author">{{ message.author.username }}</strong>
                                 <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
                             </div>
+                            {% if message.content %}
                             <div class="message-content">{{ message.content }}</div>
+                            {% endif %}
                             {% if message.image %}
                             <div class="message-image">
                                 <img src="{{ message.image.url }}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px;">
+                            </div>
+                            {% endif %}
+                            {% if message.audio %}
+                            <div class="message-audio">
+                                <audio controls class="voice-player">
+                                    <source src="{{ message.audio.url }}" type="audio/webm">
+                                    <source src="{{ message.audio.url }}" type="audio/mpeg">
+                                    Twoja przeglądarka nie wspiera odtwarzacza audio
+                                </audio>
                             </div>
                             {% endif %}
                         </div>
@@ -304,6 +315,19 @@
                         </div>
                     </div>
                     
+                    <!-- Recorder status -->
+                    <div id="voice-recorder-status" style="display: none; margin-bottom: 10px;">
+                        <div class="voice-recording-indicator">
+                            <span class="recording-dot"></span>
+                            <span id="voice-status-text">Nagrywanie...</span>
+                            <span id="voice-timer">0:00</span>
+                            <div class="voice-recording-actions">
+                                <button type="button" id="voice-record-stop" class="btn btn-secondary btn-sm">Zatrzymaj</button>
+                                <button type="button" id="voice-record-cancel" class="btn btn-secondary btn-sm">Anuluj</button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div style="display: flex; gap: 10px; width: 100%;">
                         <input type="text" 
                                id="message-input"
@@ -317,6 +341,7 @@
                                accept="image/*"
                                style="display: none;">
                         <button type="button" id="image-btn" class="btn btn-secondary" title="Dodaj obrazek">🖼️</button>
+                        <button type="button" id="voice-btn" class="btn btn-secondary" title="Nagraj wiadomość głosową">🎤</button>
                         <button type="button" id="send-btn" class="btn btn-primary">Wyślij</button>
                     </div>
                 </div>
@@ -480,7 +505,10 @@
         messageDiv.className = 'message new-message';
         messageDiv.setAttribute('data-message-id', data.message_id);
 
-        const timestamp = new Date(data.timestamp).toLocaleTimeString([], {
+        // Formatuj czas w lokalnej strefie czasowej
+        const date = new Date(data.timestamp);
+        const timestamp = date.toLocaleTimeString('pl-PL', {
+            hour12: false,
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -500,6 +528,11 @@
         // Dodaj obrazek jeśli istnieje
         if (data.image_url) {
             contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px; cursor: pointer;" data-image-url="${data.image_url}"></div>`;
+        }
+        
+        // Dodaj nagranie jeśli istnieje
+        if (data.audio_url) {
+            contentHTML += `<div class="message-audio"><audio controls class="voice-player"><source src="${data.audio_url}" type="audio/webm"><source src="${data.audio_url}" type="audio/mpeg">Twoja przeglądarka nie wspiera odtwarzacza audio</audio></div>`;
         }
 
         messageDiv.innerHTML = contentHTML;
@@ -541,13 +574,13 @@
     }
 
     // Wysłanie wiadomości
-    function sendMessage(message, imageData = null) {
+    function sendMessage(message, imageData = null, audioData = null) {
         if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
             console.warn('WebSocket nie jest dostępny.');
             return false;
         }
 
-        if (message.trim() || imageData) {
+        if (message.trim() || imageData || audioData) {
             const payload = {
                 type: 'chat_message',
             };
@@ -559,6 +592,10 @@
             
             if (imageData) {
                 payload.image = imageData;
+            }
+            
+            if (audioData) {
+                payload.audio = audioData;
             }
             
             chatSocket.send(JSON.stringify(payload));
@@ -591,8 +628,112 @@
         const imagePreviewRemove = document.getElementById('image-preview-remove');
         const lightbox = document.getElementById('lightbox');
         const lightboxClose = document.querySelector('.lightbox-close');
+        const voiceBtn = document.getElementById('voice-btn');
+        const voiceRecorderStatus = document.getElementById('voice-recorder-status');
+        const voiceStatusText = document.getElementById('voice-status-text');
+        const voiceRecordStop = document.getElementById('voice-record-stop');
+        const voiceRecordCancel = document.getElementById('voice-record-cancel');
+        const voiceTimer = document.getElementById('voice-timer');
         
         let selectedImageData = null;
+        let selectedAudioData = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingStartTime = null;
+        let timerInterval = null;
+        
+        // Voice recording function
+        async function startVoiceRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                recordingStartTime = Date.now();
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        selectedAudioData = event.target.result;
+                        voiceBtn.classList.add('image-btn-active');
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                voiceStatusText.textContent = 'Nagrywanie...';
+                voiceRecorderStatus.style.display = 'block';
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                
+                // Update timer
+                timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    voiceTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }, 100);
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                alert('Nie można uzyskać dostępu do mikrofonu');
+            }
+        }
+        
+        function stopVoiceRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                voiceStatusText.textContent = 'Nagranie gotowe';
+                messageInput.disabled = false;
+                clearInterval(timerInterval);
+                voiceTimer.textContent = '0:00';
+                sendBtn.disabled = false;
+            }
+        }
+        
+        // Voice button click handler
+        if (voiceBtn) {
+            voiceBtn.addEventListener('click', () => {
+                if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                    startVoiceRecording();
+                } else {
+                    stopVoiceRecording();
+                }
+            });
+        }
+        
+        // Cancel recording
+        if (voiceRecordCancel) {
+            voiceRecordCancel.addEventListener('click', () => {
+                if (mediaRecorder) {
+                    mediaRecorder.state !== 'inactive' && mediaRecorder.stop();
+                    // Stop all tracks
+                    const stream = mediaRecorder.stream;
+                    if (stream) stream.getTracks().forEach(track => track.stop());
+                    mediaRecorder = null;
+                }
+                selectedAudioData = null;
+                voiceBtn.classList.remove('image-btn-active');
+                voiceStatusText.textContent = 'Nagrywanie...';
+                voiceRecorderStatus.style.display = 'none';
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                clearInterval(timerInterval);
+                voiceTimer.textContent = '0:00';
+            });
+        }
+        
+        if (voiceRecordStop) {
+            voiceRecordStop.addEventListener('click', () => {
+                stopVoiceRecording();
+            });
+        }
         
         // Obsługi przycisku do wyboru obrazka
         if (imageBtn) {
@@ -633,14 +774,22 @@
         // Obsługa wysyłania wiadomości
         if (sendBtn) {
             sendBtn.addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    alert('Najpierw zatrzymaj nagrywanie, aby wysłać wiadomość.');
+                    return;
+                }
                 const message = messageInput.value;
-                if (sendMessage(message, selectedImageData)) {
+                if (sendMessage(message, selectedImageData, selectedAudioData)) {
                     messageInput.value = '';
                     messageInput.focus();
                     selectedImageData = null;
+                    selectedAudioData = null;
                     imageBtn.classList.remove('image-btn-active');
+                    voiceBtn.classList.remove('image-btn-active');
                     imagePreviewWrapper.style.display = 'none';
                     imageInput.value = '';
+                    voiceRecorderStatus.style.display = 'none';
+                    voiceStatusText.textContent = 'Nagrywanie...';
                 }
             });
         }
@@ -650,14 +799,22 @@
             messageInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        alert('Najpierw zatrzymaj nagrywanie, aby wysłać wiadomość.');
+                        return;
+                    }
                     const message = messageInput.value;
-                    if (sendMessage(message, selectedImageData)) {
+                    if (sendMessage(message, selectedImageData, selectedAudioData)) {
                         messageInput.value = '';
                         messageInput.focus();
                         selectedImageData = null;
+                        selectedAudioData = null;
                         imageBtn.classList.remove('image-btn-active');
+                        voiceBtn.classList.remove('image-btn-active');
                         imagePreviewWrapper.style.display = 'none';
                         imageInput.value = '';
+                        voiceRecorderStatus.style.display = 'none';
+                        voiceStatusText.textContent = 'Nagrywanie...';
                     }
                 }
             });

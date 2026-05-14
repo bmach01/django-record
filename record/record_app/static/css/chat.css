@@ -204,3 +204,66 @@
     color: white;
     border-color: #6c757d;
 }
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+/* Voice recording indicator */
+.voice-recording-indicator {
+    padding: 10px 15px;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #856404;
+    font-weight: 500;
+}
+
+.voice-recording-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.recording-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #dc3545;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+#voice-recorder-status {
+    display: none;
+    margin-bottom: 10px;
+}
+
+#voice-recorder-status.active {
+    display: block;
+}
+
+.message-audio {
+    margin-top: 10px;
+}
+
+.voice-player {
+    max-width: 300px;
+    width: 100%;
+    border-radius: 8px;
+    background-color: #f0f0f0;
+}
+
+.voice-player::-webkit-media-controls-panel {
+    background-color: #f0f0f0;
+}
+
