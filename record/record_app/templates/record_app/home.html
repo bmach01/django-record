@@ -6,156 +6,6 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
-<style>
-    .notification {
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        animation: slideIn 0.3s ease-in-out;
-    }
-    
-    .notification-join {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
-    }
-    
-    .notification-leave {
-        background-color: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-    }
-    
-    @keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .message.new-message {
-        animation: messageSlideIn 0.3s ease-in-out;
-    }
-    
-    @keyframes messageSlideIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    /* Lightbox styles */
-    .lightbox {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.9);
-        animation: fadeIn 0.3s ease;
-    }
-
-    .lightbox.active {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .lightbox-content {
-        max-width: 90vw;
-        max-height: 90vh;
-        position: relative;
-    }
-
-    .lightbox-content img {
-        max-width: 100%;
-        max-height: 100%;
-        object-fit: contain;
-    }
-
-    .lightbox-close {
-        position: absolute;
-        top: 20px;
-        right: 30px;
-        color: #f1f1f1;
-        font-size: 40px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: color 0.3s;
-    }
-
-    .lightbox-close:hover {
-        color: #bbb;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    /* Image preview styles */
-    .image-preview-container {
-        position: relative;
-        display: inline-block;
-        margin: 5px 0;
-    }
-
-    .image-preview {
-        max-width: 200px;
-        max-height: 150px;
-        border-radius: 8px;
-        border: 2px dashed #28a745;
-    }
-
-    .image-preview-remove {
-        position: absolute;
-        top: -10px;
-        right: -10px;
-        background: #dc3545;
-        color: white;
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-        border: none;
-        cursor: pointer;
-        font-size: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-    }
-
-    .image-preview-remove:hover {
-        background: #c82333;
-    }
-
-    /* Image button highlight */
-    .image-btn-active {
-        background-color: #28a745 !important;
-        color: white !important;
-    }
-
-    .message-image img {
-        cursor: pointer;
-        transition: transform 0.2s, filter 0.2s;
-    }
-
-    .message-image img:hover {
-        transform: scale(1.02);
-        filter: brightness(1.1);
-    }
-</style>
 {% endblock %}
 
 {% block content %}
@@ -198,7 +48,7 @@
                         </div>
                         {% endfor %}
                         {% if not text_channels %}
-                        <div style="color: #999; font-size: 0.9rem; padding: 10px; text-align: center;">
+                        <div class="channel-list-empty">
                             Brak kanałów
                         </div>
                         {% endif %}
@@ -228,7 +78,7 @@
                         </div>
                         {% endfor %}
                         {% if not voice_channels %}
-                        <div style="color: #999; font-size: 0.9rem; padding: 10px; text-align: center;">
+                        <div class="channel-list-empty">
                             Brak kanałów
                         </div>
                         {% endif %}
@@ -266,6 +116,7 @@
                 {% endif %}
             </div>
 
+            {% if selected_channel.channel_type == 'text' %}
             <!-- Obszar wiadomości -->
             <div class="messages-area">
                 <div class="messages-container" id="messages-container">
@@ -281,7 +132,7 @@
                             {% endif %}
                             {% if message.image %}
                             <div class="message-image">
-                                <img src="{{ message.image.url }}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px;">
+                                <img src="{{ message.image.url }}" alt="Obrazek">
                             </div>
                             {% endif %}
                             {% if message.audio %}
@@ -304,19 +155,18 @@
             </div>
 
             <!-- Pole do wysyłania wiadomości -->
-            {% if selected_channel.channel_type == 'text' %}
             <div class="message-input-area">
                 <div class="message-form" id="message-form-wrapper">
                     <!-- Preview wybranego obrazka -->
-                    <div id="image-preview-wrapper" style="display: none; margin-bottom: 10px;">
+                    <div id="image-preview-wrapper" style="display: none;">
                         <div class="image-preview-container">
                             <img id="image-preview-img" src="" alt="Preview" class="image-preview">
                             <button type="button" class="image-preview-remove" id="image-preview-remove">✕</button>
                         </div>
                     </div>
-                    
+
                     <!-- Recorder status -->
-                    <div id="voice-recorder-status" style="display: none; margin-bottom: 10px;">
+                    <div id="voice-recorder-status" style="display: none;">
                         <div class="voice-recording-indicator">
                             <span class="recording-dot"></span>
                             <span id="voice-status-text">Nagrywanie...</span>
@@ -327,19 +177,17 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <div style="display: flex; gap: 10px; width: 100%;">
-                        <input type="text" 
+
+                    <div class="message-input-row">
+                        <input type="text"
                                id="message-input"
-                               name="content" 
-                               class="form-control" 
-                               placeholder="Napisz wiadomość..." 
-                               autocomplete="off"
-                               style="flex: 1;">
-                        <input type="file" 
+                               name="content"
+                               class="form-control"
+                               placeholder="Napisz wiadomość..."
+                               autocomplete="off">
+                        <input type="file"
                                id="image-input"
-                               accept="image/*"
-                               style="display: none;">
+                               accept="image/*">
                         <button type="button" id="image-btn" class="btn btn-secondary" title="Dodaj obrazek">🖼️</button>
                         <button type="button" id="voice-btn" class="btn btn-secondary" title="Nagraj wiadomość głosową">🎤</button>
                         <button type="button" id="send-btn" class="btn btn-primary">Wyślij</button>
@@ -347,8 +195,43 @@
                 </div>
             </div>
             {% else %}
-            <div class="message-input-area voice-notice">
-                <p>🔊 To jest kanał głosowy. Funkcja audio wkrótce.</p>
+            <!-- Voice channel UI -->
+            <div class="voice-channel-area">
+                <div id="voice-not-joined">
+                    <div class="voice-join-prompt">
+                        <div class="voice-icon-large">🔊</div>
+                        <h4>{{ selected_channel.name }}</h4>
+                        <p>Kanał głosowy — kliknij, aby dołączyć do rozmowy</p>
+                        <div id="voice-preview-participants" class="voice-preview-participants"></div>
+                        <button id="voice-join-btn" class="btn btn-success btn-lg">
+                            🎙️ Dołącz do rozmowy
+                        </button>
+                    </div>
+                </div>
+
+                <div id="voice-joined" style="display: none;">
+                    <div class="voice-active-header">
+                        <div class="voice-active-indicator">
+                            <span class="voice-live-dot"></span>
+                            Trwa rozmowa głosowa
+                        </div>
+                        <div class="voice-controls-bar">
+                            <button id="voice-mute-btn" class="btn btn-secondary">🎤 Wycisz</button>
+                            <button id="voice-leave-btn" class="btn btn-danger">📴 Rozłącz</button>
+                        </div>
+                    </div>
+
+                    <div class="voice-participants-grid" id="voice-participants-list">
+                        <div class="voice-participant-card" id="voice-self-item">
+                            <div class="participant-avatar">{{ user.username|first|upper }}</div>
+                            <div class="participant-name">{{ user.username }} <small>(Ty)</small></div>
+                            <div class="participant-status">
+                                <span class="participant-dot connected"></span>
+                                <span class="participant-mute-icon" id="voice-self-mute-icon">🎤</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% endif %}
 
@@ -383,6 +266,7 @@
 <script>
     // WebSocket Configuration
     const selectedChannelId = "{{ selected_channel.id|default:'' }}";
+    const channelType = "{{ selected_channel.channel_type|default:'' }}";
     const userId = "{{ user.id }}";
     const username = "{{ user.username }}";
     let chatSocket = null;
@@ -527,7 +411,7 @@
         
         // Dodaj obrazek jeśli istnieje
         if (data.image_url) {
-            contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px; cursor: pointer;" data-image-url="${data.image_url}"></div>`;
+            contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" data-image-url="${data.image_url}"></div>`;
         }
         
         // Dodaj nagranie jeśli istnieje
@@ -853,7 +737,9 @@
         addLightboxToImages();
 
         // Inicjalizuj WebSockety
-        initChatSocket();
+        if (channelType === 'text') {
+            initChatSocket();
+        }
         initChannelSocket();
     });
 
@@ -864,6 +750,362 @@
         }
         if (channelSocket && channelSocket.readyState === WebSocket.OPEN) {
             channelSocket.close();
+        }
+        if (typeof voiceSocket !== 'undefined' && voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+            voiceSocket.close();
+        }
+        if (typeof localStream !== 'undefined' && localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+    });
+
+    // ===== KANAŁ GŁOSOWY - WebRTC =====
+    let voiceSocket = null;
+    let localStream = null;
+    const peerConnections = {};
+    let isVoiceMuted = false;
+    let isVoiceActive = false;
+    let presenceParticipants = [];
+    const iceConfig = {
+        iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+        ]
+    };
+
+    function initVoiceSocket() {
+        const wsScheme = getWebSocketScheme();
+        voiceSocket = new WebSocket(`${wsScheme}//${window.location.host}/ws/voice/${selectedChannelId}/`);
+
+        voiceSocket.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+            await handleVoiceMessage(data);
+        };
+
+        voiceSocket.onclose = () => {
+            console.log('Voice WebSocket rozłączony.');
+        };
+
+        voiceSocket.onerror = (e) => {
+            console.error('Voice WebSocket error:', e);
+        };
+    }
+
+    function updateVoicePreview(participants) {
+        const container = document.getElementById('voice-preview-participants');
+        if (!container) return;
+
+        if (participants.length === 0) {
+            container.innerHTML = '<span class="voice-preview-empty">Nikt na kanale</span>';
+            return;
+        }
+
+        const shown = participants.slice(0, 3);
+        const remaining = participants.length - 3;
+
+        let html = '<div class="voice-preview-row"><div class="voice-preview-avatars">';
+        shown.forEach(p => {
+            html += `<div class="voice-preview-avatar" title="${escapeHtml(p.username)}">${escapeHtml(p.username.charAt(0).toUpperCase())}</div>`;
+        });
+        if (remaining > 0) {
+            html += `<div class="voice-preview-more">···</div>`;
+        }
+        html += '</div>';
+        const namesList = shown.map(p => escapeHtml(p.username));
+        const namesText = remaining > 0 ? namesList.join(', ') + ` i ${remaining} więcej` : namesList.join(', ');
+        html += `<span class="voice-preview-names">${namesText}</span></div>`;
+        container.innerHTML = html;
+    }
+
+    async function handleVoiceMessage(data) {
+        switch (data.type) {
+            case 'voice_presence':
+                presenceParticipants = data.participants;
+                updateVoicePreview(presenceParticipants);
+                break;
+
+            case 'voice_init':
+                for (const p of data.participants) {
+                    addParticipantCard(p.user_id, p.username, p.muted || false);
+                    await createOffer(p.user_id, p.username);
+                }
+                break;
+
+            case 'voice_user_joined':
+                if (data.user_id !== parseInt(userId)) {
+                    if (!presenceParticipants.find(p => p.user_id === data.user_id)) {
+                        presenceParticipants.push({ user_id: data.user_id, username: data.username, muted: false });
+                    }
+                    updateVoicePreview(presenceParticipants);
+                    if (isVoiceActive) {
+                        addParticipantCard(data.user_id, data.username, false);
+                    }
+                }
+                break;
+
+            case 'voice_user_left':
+                presenceParticipants = presenceParticipants.filter(p => p.user_id !== data.user_id);
+                updateVoicePreview(presenceParticipants);
+                if (isVoiceActive) {
+                    closePeerConnection(data.user_id);
+                    removeParticipantCard(data.user_id);
+                }
+                break;
+
+            case 'voice_mute_status': {
+                const pIdx = presenceParticipants.findIndex(p => p.user_id === data.user_id);
+                if (pIdx !== -1) presenceParticipants[pIdx].muted = data.muted;
+                updateParticipantMuteStatus(data.user_id, data.muted);
+                break;
+            }
+
+            case 'webrtc_offer':
+                await handleOffer(data.from_user_id, data.from_username, data.data);
+                break;
+            case 'webrtc_answer':
+                await handleAnswer(data.from_user_id, data.data);
+                break;
+            case 'webrtc_ice_candidate':
+                await handleIceCandidate(data.from_user_id, data.data);
+                break;
+        }
+    }
+
+    function createPeerConnection(peerId, peerUsername) {
+        if (peerConnections[peerId]) return peerConnections[peerId];
+
+        const pc = new RTCPeerConnection(iceConfig);
+        peerConnections[peerId] = pc;
+
+        // Dodaj lokalne ścieżki audio
+        if (localStream) {
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        }
+
+        // Odtwórz zdalny dźwięk
+        pc.ontrack = (event) => {
+            let audio = document.getElementById(`voice-audio-${peerId}`);
+            if (!audio) {
+                audio = document.createElement('audio');
+                audio.id = `voice-audio-${peerId}`;
+                audio.autoplay = true;
+                audio.playsInline = true;
+                document.body.appendChild(audio);
+            }
+            audio.srcObject = event.streams[0];
+        };
+
+        // Wymiana kandydatów ICE
+        pc.onicecandidate = (event) => {
+            if (event.candidate && voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+                voiceSocket.send(JSON.stringify({
+                    type: 'webrtc_ice_candidate',
+                    target_user_id: peerId,
+                    data: event.candidate.toJSON(),
+                }));
+            }
+        };
+
+        // Aktualizuj status kropki przy uczestnikach
+        pc.onconnectionstatechange = () => {
+            const card = document.getElementById(`voice-participant-${peerId}`);
+            if (card) {
+                const dot = card.querySelector('.participant-dot');
+                if (dot) {
+                    dot.className = 'participant-dot' + (pc.connectionState === 'connected' ? ' connected' : '');
+                }
+            }
+        };
+
+        return pc;
+    }
+
+    async function createOffer(peerId, peerUsername) {
+        const pc = createPeerConnection(peerId, peerUsername);
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+                voiceSocket.send(JSON.stringify({
+                    type: 'webrtc_offer',
+                    target_user_id: peerId,
+                    data: pc.localDescription.toJSON(),
+                }));
+            }
+        } catch (e) {
+            console.error('Błąd tworzenia offer:', e);
+        }
+    }
+
+    async function handleOffer(peerId, peerUsername, offerData) {
+        addParticipantCard(peerId, peerUsername);
+        const pc = createPeerConnection(peerId, peerUsername);
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(offerData));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            if (voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+                voiceSocket.send(JSON.stringify({
+                    type: 'webrtc_answer',
+                    target_user_id: peerId,
+                    data: pc.localDescription.toJSON(),
+                }));
+            }
+        } catch (e) {
+            console.error('Błąd obsługi offer:', e);
+        }
+    }
+
+    async function handleAnswer(peerId, answerData) {
+        const pc = peerConnections[peerId];
+        if (pc) {
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(answerData));
+            } catch (e) {
+                console.error('Błąd obsługi answer:', e);
+            }
+        }
+    }
+
+    async function handleIceCandidate(peerId, candidateData) {
+        const pc = peerConnections[peerId];
+        if (pc && candidateData) {
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidateData));
+            } catch (e) {
+                console.error('Błąd dodawania ICE candidate:', e);
+            }
+        }
+    }
+
+    function closePeerConnection(peerId) {
+        if (peerConnections[peerId]) {
+            peerConnections[peerId].close();
+            delete peerConnections[peerId];
+        }
+        const audio = document.getElementById(`voice-audio-${peerId}`);
+        if (audio) audio.remove();
+    }
+
+    function addParticipantCard(peerId, peerUsername, muted = false) {
+        const list = document.getElementById('voice-participants-list');
+        if (!list || document.getElementById(`voice-participant-${peerId}`)) return;
+
+        const card = document.createElement('div');
+        card.id = `voice-participant-${peerId}`;
+        card.className = 'voice-participant-card';
+        card.innerHTML = `
+            <div class="participant-avatar">${escapeHtml(peerUsername.charAt(0).toUpperCase())}</div>
+            <div class="participant-name">${escapeHtml(peerUsername)}</div>
+            <div class="participant-status">
+                <span class="participant-dot"></span>
+                <span class="participant-mute-icon">${muted ? '🔇' : '🎤'}</span>
+            </div>
+        `;
+        list.appendChild(card);
+    }
+
+    function removeParticipantCard(peerId) {
+        const card = document.getElementById(`voice-participant-${peerId}`);
+        if (card) card.remove();
+    }
+
+    function updateParticipantMuteStatus(peerId, muted) {
+        let icon;
+        if (parseInt(userId) === peerId) {
+            icon = document.getElementById('voice-self-mute-icon');
+        } else {
+            const card = document.getElementById(`voice-participant-${peerId}`);
+            if (card) icon = card.querySelector('.participant-mute-icon');
+        }
+        if (icon) icon.textContent = muted ? '🔇' : '🎤';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (channelType !== 'voice') return;
+
+        // Connect immediately for presence tracking (no mic yet)
+        initVoiceSocket();
+
+        const joinBtn = document.getElementById('voice-join-btn');
+        const muteBtn = document.getElementById('voice-mute-btn');
+        const leaveBtn = document.getElementById('voice-leave-btn');
+
+        if (joinBtn) {
+            joinBtn.addEventListener('click', async () => {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    isVoiceActive = true;
+
+                    document.getElementById('voice-not-joined').style.display = 'none';
+                    document.getElementById('voice-joined').style.display = 'flex';
+
+                    const doJoin = () => voiceSocket.send(JSON.stringify({ type: 'voice_join' }));
+                    if (voiceSocket.readyState === WebSocket.OPEN) {
+                        doJoin();
+                    } else {
+                        voiceSocket.addEventListener('open', doJoin, { once: true });
+                    }
+                } catch (e) {
+                    console.error('Błąd dostępu do mikrofonu:', e);
+                    alert('Nie można uzyskać dostępu do mikrofonu. Sprawdź uprawnienia przeglądarki.');
+                }
+            });
+        }
+
+        if (muteBtn) {
+            muteBtn.addEventListener('click', () => {
+                isVoiceMuted = !isVoiceMuted;
+                if (localStream) {
+                    localStream.getAudioTracks().forEach(track => { track.enabled = !isVoiceMuted; });
+                }
+                muteBtn.textContent = isVoiceMuted ? '🔇 Odcisz' : '🎤 Wycisz';
+                muteBtn.classList.toggle('btn-warning', isVoiceMuted);
+                muteBtn.classList.toggle('btn-secondary', !isVoiceMuted);
+
+                const selfMuteIcon = document.getElementById('voice-self-mute-icon');
+                if (selfMuteIcon) selfMuteIcon.textContent = isVoiceMuted ? '🔇' : '🎤';
+
+                if (voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+                    voiceSocket.send(JSON.stringify({ type: 'voice_mute_status', muted: isVoiceMuted }));
+                }
+            });
+        }
+
+        if (leaveBtn) {
+            leaveBtn.addEventListener('click', () => {
+                Object.keys(peerConnections).forEach(pid => closePeerConnection(parseInt(pid)));
+
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                }
+
+                isVoiceActive = false;
+
+                // Tell server we're leaving the call (stay connected for presence)
+                if (voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+                    voiceSocket.send(JSON.stringify({ type: 'voice_leave' }));
+                }
+
+                // Wyczyść listę uczestników (zostaw tylko siebie)
+                const list = document.getElementById('voice-participants-list');
+                if (list) {
+                    list.querySelectorAll('.voice-participant-card:not(#voice-self-item)').forEach(c => c.remove());
+                }
+
+                document.getElementById('voice-not-joined').style.display = 'flex';
+                document.getElementById('voice-joined').style.display = 'none';
+
+                isVoiceMuted = false;
+                if (muteBtn) {
+                    muteBtn.textContent = '🎤 Wycisz';
+                    muteBtn.classList.remove('btn-warning');
+                    muteBtn.classList.add('btn-secondary');
+                }
+                const selfMuteIconReset = document.getElementById('voice-self-mute-icon');
+                if (selfMuteIconReset) selfMuteIconReset.textContent = '🎤';
+            });
         }
     });
 </script>
