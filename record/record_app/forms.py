@@ -97,6 +97,23 @@ class RegisterForm(UserCreationForm):
         return user
 
 
+class ProfileForm(forms.ModelForm):
+    avatar = forms.ImageField(
+        required=False,
+        label='Avatar',
+        widget=forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'})
+    )
+
+    class Meta:
+        model = User
+        fields = ('avatar', 'first_name', 'last_name', 'description')
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Imię'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nazwisko'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Opis profilu', 'rows': 3}),
+        }
+
+
 class ChannelForm(forms.ModelForm):
     class Meta:
         model = Channel

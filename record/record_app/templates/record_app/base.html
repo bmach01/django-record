@@ -15,7 +15,10 @@
         </div>
         <div>
             {% if user.is_authenticated %}
-                <span>Zalogowany: <strong>{{ user.username }}</strong></span>
+                <a href="{% url 'profile' %}" class="nav-avatar-wrap" style="margin-left:1rem;">
+                    <img src="{{ user.avatar_url }}" alt="{{ user.username }}" class="avatar avatar-sm">
+                    <strong>{{ user.username }}</strong>
+                </a>
                 <a href="{% url 'private_conversations' %}">💬 Wiadomości</a>
                 <a href="{% url 'logout' %}">Wyloguj się</a>
             {% else %}

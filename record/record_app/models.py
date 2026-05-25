@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.conf import settings
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -14,7 +15,14 @@ class User(AbstractUser):
         default='user'
     )
     description = models.TextField(blank=True, null=True)
-    
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+
+    @property
+    def avatar_url(self):
+        if self.avatar:
+            return self.avatar.url
+        return f'{settings.MEDIA_URL}avatars/default_pfp.jpg'
+
     class Meta:
         verbose_name = 'Użytkownik'
         verbose_name_plural = 'Użytkownicy'

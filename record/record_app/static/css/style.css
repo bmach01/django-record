@@ -40,6 +40,43 @@ nav a:hover, nav button:hover {
     background: rgba(255, 255, 255, 0.1);
 }
 
+/* Avatars */
+.avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.avatar-placeholder {
+    border-radius: 50%;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+    user-select: none;
+    text-transform: uppercase;
+}
+
+.avatar-sm, .avatar-placeholder-sm { width: 28px; height: 28px; font-size: 11px; }
+.avatar-md, .avatar-placeholder-md { width: 48px; height: 48px; font-size: 18px; }
+.avatar-lg, .avatar-placeholder-lg { width: 56px; height: 56px; font-size: 22px; }
+
+.nav-avatar-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: white;
+    text-decoration: none;
+}
+
+.nav-avatar-wrap:hover {
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
 /* Container */
 .container {
     flex: 1;

@@ -85,10 +85,13 @@
             </div>
 
             <!-- Informacja o profilu -->
-            <div class="sidebar-footer">
-                <strong>{{ user.username }}</strong>
-                <small>{{ user.get_role_display }}</small>
-            </div>
+            <a href="{% url 'profile' %}" class="sidebar-footer">
+                <img src="{{ user.avatar_url }}" alt="{{ user.username }}" class="avatar avatar-md">
+                <div>
+                    <strong>{{ user.username }}</strong>
+                    <small>{{ user.get_role_display }}</small>
+                </div>
+            </a>
         </aside>
 
         <!-- Główny obszar - Chat -->
@@ -121,30 +124,33 @@
                     {% if messages|length > 0 %}
                         {% for message in messages %}
                         <div class="message" data-message-id="{{ message.id }}">
-                            <div class="message-header">
-                                <strong class="message-author">{{ message.author.username }}</strong>
-                                <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
-                                {% if is_admin %}
-                                <button class="delete-msg-btn" data-message-id="{{ message.id }}" title="Usuń wiadomość">🗑️</button>
+                            <img src="{{ message.author.avatar_url }}" alt="{{ message.author.username }}" class="avatar avatar-md">
+                            <div class="message-body">
+                                <div class="message-header">
+                                    <strong class="message-author">{{ message.author.username }}</strong>
+                                    <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
+                                    {% if is_admin %}
+                                    <button class="delete-msg-btn" data-message-id="{{ message.id }}" title="Usuń wiadomość">🗑️</button>
+                                    {% endif %}
+                                </div>
+                                {% if message.content %}
+                                <div class="message-content">{{ message.content }}</div>
+                                {% endif %}
+                                {% if message.image %}
+                                <div class="message-image">
+                                    <img src="{{ message.image.url }}" alt="Obrazek">
+                                </div>
+                                {% endif %}
+                                {% if message.audio %}
+                                <div class="message-audio">
+                                    <audio controls class="voice-player">
+                                        <source src="{{ message.audio.url }}" type="audio/webm">
+                                        <source src="{{ message.audio.url }}" type="audio/mpeg">
+                                        Twoja przeglądarka nie wspiera odtwarzacza audio
+                                    </audio>
+                                </div>
                                 {% endif %}
                             </div>
-                            {% if message.content %}
-                            <div class="message-content">{{ message.content }}</div>
-                            {% endif %}
-                            {% if message.image %}
-                            <div class="message-image">
-                                <img src="{{ message.image.url }}" alt="Obrazek">
-                            </div>
-                            {% endif %}
-                            {% if message.audio %}
-                            <div class="message-audio">
-                                <audio controls class="voice-player">
-                                    <source src="{{ message.audio.url }}" type="audio/webm">
-                                    <source src="{{ message.audio.url }}" type="audio/mpeg">
-                                    Twoja przeglądarka nie wspiera odtwarzacza audio
-                                </audio>
-                            </div>
-                            {% endif %}
                         </div>
                         {% endfor %}
                     {% else %}
@@ -274,6 +280,10 @@
     let chatSocket = null;
     let channelSocket = null;
 
+    function avatarHtml(avatarUrl, username, sizeClass) {
+        return `<img src="${avatarUrl}" alt="${escapeHtml(username)}" class="avatar ${sizeClass}">`;
+    }
+
     // Funkcja do obsługi WebSocket URI
     function getWebSocketScheme() {
         return window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -402,30 +412,19 @@
             minute: '2-digit'
         });
 
-        let contentHTML = `
+        let bodyHTML = `
             <div class="message-header">
                 <strong class="message-author">${escapeHtml(data.username)}</strong>
                 <span class="message-time">${timestamp}</span>
                 ${isModerator ? `<button class="delete-msg-btn" data-message-id="${data.message_id}" title="Usuń wiadomość">🗑️</button>` : ''}
             </div>
         `;
-        
-        // Dodaj wiadomość tekstową tylko jeśli nie jest pusta
-        if (data.message) {
-            contentHTML += `<div class="message-content">${escapeHtml(data.message)}</div>`;
-        }
-        
-        // Dodaj obrazek jeśli istnieje
-        if (data.image_url) {
-            contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" data-image-url="${data.image_url}"></div>`;
-        }
-        
-        // Dodaj nagranie jeśli istnieje
-        if (data.audio_url) {
-            contentHTML += `<div class="message-audio"><audio controls class="voice-player"><source src="${data.audio_url}" type="audio/webm"><source src="${data.audio_url}" type="audio/mpeg">Twoja przeglądarka nie wspiera odtwarzacza audio</audio></div>`;
-        }
+        if (data.message) bodyHTML += `<div class="message-content">${escapeHtml(data.message)}</div>`;
+        if (data.image_url) bodyHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" data-image-url="${data.image_url}"></div>`;
+        if (data.audio_url) bodyHTML += `<div class="message-audio"><audio controls class="voice-player"><source src="${data.audio_url}" type="audio/webm"><source src="${data.audio_url}" type="audio/mpeg">Twoja przeglądarka nie wspiera odtwarzacza audio</audio></div>`;
 
-        messageDiv.innerHTML = contentHTML;
+        messageDiv.innerHTML = avatarHtml(data.avatar_url, data.username, 'avatar-md') +
+            `<div class="message-body">${bodyHTML}</div>`;
         container.appendChild(messageDiv);
         
         // Dodaj event listener do obrazków
@@ -522,6 +521,7 @@
             });
         }
         window.addEventListener('load', scrollToBottom);
+
 
         const messageInput = document.getElementById('message-input');
         const imageInput = document.getElementById('image-input');

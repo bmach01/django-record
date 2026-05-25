@@ -348,6 +348,16 @@ body {
     border-top: 1px solid #ddd;
     background-color: #ebebeb;
     font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s;
+}
+
+.sidebar-footer:hover {
+    background-color: #ddd;
 }
 
 .sidebar-footer strong {
@@ -433,14 +443,22 @@ body {
 }
 
 .message {
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-radius: 6px;
     background-color: #f8f9fa;
     transition: background-color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .message:hover {
     background-color: #f0f0f0;
+}
+
+.message-body {
+    flex: 1;
+    min-width: 0;
 }
 
 .message-header {

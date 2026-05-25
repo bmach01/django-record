@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.urls import reverse
-from .forms import LoginForm, RegisterForm, ChannelForm, MessageForm, PrivateMessageForm, StartPrivateConversationForm
+from .forms import LoginForm, RegisterForm, ChannelForm, MessageForm, PrivateMessageForm, StartPrivateConversationForm, ProfileForm
 from .models import Channel, ChannelMembership, Message, PrivateConversation, PrivateMessage
 
 User = get_user_model()
@@ -57,6 +57,26 @@ def logout_view(request):
     logout(request)
     messages.success(request, "Wylogowany pomyślnie.")
     return redirect('login')
+
+
+@login_required(login_url='login')
+def profile_view(request):
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            user = form.save()
+            if user.avatar and 'avatar' in request.FILES:
+                from PIL import Image, ImageOps
+                path = user.avatar.path
+                with Image.open(path) as img:
+                    img = img.convert('RGB')
+                    img = ImageOps.fit(img, (128, 128), Image.LANCZOS)
+                    img.save(path, quality=90, optimize=True)
+            messages.success(request, "Profil zaktualizowany.")
+            return redirect('profile')
+    else:
+        form = ProfileForm(instance=request.user)
+    return render(request, 'record_app/profile.html', {'form': form})
 
 
 @login_required(login_url='login')

@@ -79,25 +79,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     # Zapisz wiadomość do bazy danych
                     message = await self.save_message(content, image_data, audio_data)
                     if message:
-                        # Przygotuj dane do wysłania
                         broadcast_data = {
                             "type": "chat_message",
                             "message": content,
                             "username": self.user.username,
                             "user_id": self.user.id,
+                            "avatar_url": self.user.avatar_url,
                             "timestamp": message.created_at.isoformat(),
                             "message_id": message.id,
                         }
 
-                        # Jeśli jest obrazek, dodaj jego URL
                         if message.image:
                             broadcast_data["image_url"] = message.image.url
 
-                        # Jeśli jest nagranie, dodaj jego URL
                         if message.audio:
                             broadcast_data["audio_url"] = message.audio.url
 
-                        # Wyślij do grupy
                         await self.channel_layer.group_send(
                             self.channel_group_name,
                             broadcast_data,
@@ -127,18 +124,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message": event["message"],
             "username": event["username"],
             "user_id": event["user_id"],
+            "avatar_url": event.get("avatar_url"),
             "timestamp": event["timestamp"],
             "message_id": event["message_id"],
         }
-        
-        # Dodaj URL obrazka jeśli istnieje
+
         if "image_url" in event:
             response_data["image_url"] = event["image_url"]
-        
-        # Dodaj URL nagrania jeśli istnieje
+
         if "audio_url" in event:
             response_data["audio_url"] = event["audio_url"]
-        
+
         await self.send(text_data=json.dumps(response_data))
 
     async def user_joined(self, event):
@@ -391,28 +387,24 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
                 audio_data = data.get("audio")  # base64 encoded audio
                 
                 if content or image_data or audio_data:
-                    # Zapisz wiadomość do bazy danych
                     message = await self.save_message(content, image_data, audio_data)
                     if message:
-                        # Przygotuj dane do wysłania
                         broadcast_data = {
                             "type": "chat_message",
                             "message": content,
                             "username": self.user.username,
                             "user_id": self.user.id,
+                            "avatar_url": self.user.avatar_url,
                             "timestamp": message.created_at.isoformat(),
                             "message_id": message.id,
                         }
-                        
-                        # Jeśli jest obrazek, dodaj jego URL
+
                         if message.image:
                             broadcast_data["image_url"] = message.image.url
-                        
-                        # Jeśli jest nagranie, dodaj jego URL
+
                         if message.audio:
                             broadcast_data["audio_url"] = message.audio.url
-                        
-                        # Wyślij do grupy
+
                         await self.channel_layer.group_send(
                             self.group_name,
                             broadcast_data,
@@ -421,26 +413,22 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             pass
 
     async def chat_message(self, event):
-        """
-        Receive a chat message from the group and send it to the WebSocket.
-        """
         response_data = {
             "type": "chat_message",
             "message": event["message"],
             "username": event["username"],
             "user_id": event["user_id"],
+            "avatar_url": event.get("avatar_url"),
             "timestamp": event["timestamp"],
             "message_id": event["message_id"],
         }
-        
-        # Dodaj URL obrazka jeśli istnieje
+
         if "image_url" in event:
             response_data["image_url"] = event["image_url"]
-        
-        # Dodaj URL nagrania jeśli istnieje
+
         if "audio_url" in event:
             response_data["audio_url"] = event["audio_url"]
-        
+
         await self.send(text_data=json.dumps(response_data))
 
     @database_sync_to_async

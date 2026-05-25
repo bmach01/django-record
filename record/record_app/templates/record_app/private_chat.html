@@ -13,7 +13,10 @@
 <div class="private-chat-wrapper">
     <!-- Header czatu prywatnego -->
     <div class="private-chat-header">
-        <h3>💬 Rozmowa z {{ other_user.username }}</h3>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <img src="{{ other_user.avatar_url }}" alt="{{ other_user.username }}" class="avatar avatar-md">
+            <h3 style="margin:0;">Rozmowa z {{ other_user.username }}</h3>
+        </div>
         <a href="{% url 'private_conversations' %}" class="back-to-conversations">← Wróć do rozmów</a>
     </div>
 
@@ -22,8 +25,13 @@
         <div class="private-messages-container" id="messages-container">
             {% if messages|length > 0 %}
                 {% for message in messages %}
-                <div class="private-message {% if message.sender == user %}own{% endif %}">
+                <div class="private-message">
+                    <img src="{{ message.sender.avatar_url }}" alt="{{ message.sender.username }}" class="avatar avatar-md">
                     <div class="message-wrapper">
+                        <div class="message-header">
+                            <strong class="message-sender-name">{{ message.sender.username }}</strong>
+                            <span class="message-time">{{ message.created_at|localtime|date:"H:i" }}</span>
+                        </div>
                         {% if message.content %}
                         <div class="message-bubble">{{ message.content }}</div>
                         {% endif %}
@@ -41,7 +49,6 @@
                             </audio>
                         </div>
                         {% endif %}
-                        <div class="message-time">{{ message.created_at|localtime|date:"H:i" }}</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -105,6 +112,12 @@
 </div>
 
 <script>
+    const currentUserId = "{{ user.id }}";
+
+    function avatarHtml(avatarUrl, username, sizeClass) {
+        return `<img src="${avatarUrl}" alt="" class="avatar ${sizeClass}">`;
+    }
+
     // Przewiń do dołu gdy załaduje strona
     const container = document.getElementById('messages-container');
     const scrollArea = container ? container.parentElement : null;
@@ -146,25 +159,28 @@
 
     function addMessage(data) {
         const container = document.getElementById('messages-container');
-        const isOwnMessage = data.user_id === user.id;
+        const isOwnMessage = String(data.user_id) === currentUserId;
 
         if (container.querySelector('.no-messages')) {
             container.innerHTML = '';
         }
 
         const messageDiv = document.createElement('div');
-        messageDiv.className = `private-message ${isOwnMessage ? 'own' : ''}`;
-        
-        let contentHTML = `
-            <div class="message-wrapper">
-        `;
-        
-        // Dodaj wiadomość tekstową tylko jeśli nie jest pusta
+        messageDiv.className = 'private-message';
+
+        messageDiv.insertAdjacentHTML('beforeend', avatarHtml(data.avatar_url, data.username, 'avatar-md'));
+
+        let contentHTML = `<div class="message-wrapper">`;
+
+        contentHTML += `<div class="message-header">
+                <strong class="message-sender-name">${escapeHtml(data.username)}</strong>
+                <span class="message-time">${new Date(data.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}</span>
+            </div>`;
+
         if (data.message) {
             contentHTML += `<div class="message-bubble">${escapeHtml(data.message)}</div>`;
         }
-        
-        // Dodaj obrazek jeśli istnieje
+
         if (data.image_url) {
             contentHTML += `<div class="message-image"><img src="${data.image_url}" alt="Obrazek" style="max-width: 300px; max-height: 300px; margin-top: 10px; border-radius: 8px; cursor: pointer;" data-image-url="${data.image_url}"></div>`;
         }
@@ -174,9 +190,7 @@
             contentHTML += `<div class="message-audio"><audio controls class="voice-player"><source src="${data.audio_url}" type="audio/webm"><source src="${data.audio_url}" type="audio/mpeg">Twoja przeglądarka nie wspiera odtwarzacza audio</audio></div>`;
         }
         
-        contentHTML += `<div class="message-time">${new Date(data.timestamp).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'})}</div>
-            </div>
-        `;
+        contentHTML += `</div>`;
         
         messageDiv.innerHTML = contentHTML;
         container.appendChild(messageDiv);
