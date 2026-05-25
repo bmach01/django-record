@@ -151,7 +151,8 @@
 .private-message-form .btn-container {
     display: flex;
     gap: 5px;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
 }
 
 /* Send Button */
