@@ -1,6 +1,6 @@
 {% extends "record_app/base.html" %}
 
-{% load static %}
+{% load static tz %}
 
 {% block title %}Czat Prywatny - Record{% endblock %}
 
@@ -107,9 +107,17 @@
 <script>
     // Przewiń do dołu gdy załaduje strona
     const container = document.getElementById('messages-container');
-    if (container) {
-        container.scrollTop = container.scrollHeight;
+    const scrollArea = container ? container.parentElement : null;
+    function scrollToBottom() {
+        if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
     }
+    scrollToBottom();
+    if (container) {
+        container.querySelectorAll('img').forEach(img => {
+            img.addEventListener('load', scrollToBottom);
+        });
+    }
+    window.addEventListener('load', scrollToBottom);
 
     // Ustawienie WebSocket
     const ws = new WebSocket(
@@ -184,7 +192,7 @@
             });
         }
         
-        container.scrollTop = container.scrollHeight;
+        container.parentElement.scrollTop = container.parentElement.scrollHeight;
     }
 
     function escapeHtml(text) {

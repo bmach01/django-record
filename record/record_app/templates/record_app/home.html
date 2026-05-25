@@ -442,7 +442,7 @@
         }
 
         // Scroll do ostatniej wiadomości
-        container.scrollTop = container.scrollHeight;
+        container.parentElement.scrollTop = container.parentElement.scrollHeight;
     }
 
     // Wyświetlenie powiadomienia
@@ -462,7 +462,7 @@
         }, 5000);
 
         // Scroll do powiadomienia
-        container.scrollTop = container.scrollHeight;
+        container.parentElement.scrollTop = container.parentElement.scrollHeight;
     }
 
     // Wysłanie wiadomości
@@ -511,6 +511,20 @@
 
     // Event listener dla formularza wiadomości
     document.addEventListener('DOMContentLoaded', () => {
+        // Przewiń do najnowszej wiadomości przy załadowaniu
+        const msgContainer = document.getElementById('messages-container');
+        const msgScrollArea = msgContainer ? msgContainer.parentElement : null;
+        function scrollToBottom() {
+            if (msgScrollArea) msgScrollArea.scrollTop = msgScrollArea.scrollHeight;
+        }
+        scrollToBottom();
+        if (msgContainer) {
+            msgContainer.querySelectorAll('img').forEach(img => {
+                img.addEventListener('load', scrollToBottom);
+            });
+        }
+        window.addEventListener('load', scrollToBottom);
+
         const messageInput = document.getElementById('message-input');
         const imageInput = document.getElementById('image-input');
         const imageBtn = document.getElementById('image-btn');
