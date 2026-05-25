@@ -76,10 +76,16 @@ class RegisterForm(UserCreationForm):
             'placeholder': 'Powtórz hasło'
         })
 
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError("Ta nazwa użytkownika jest już zajęta.")
+        return username
+
     def clean_email(self):
-        email = self.cleaned_data.get('email')
-        if User.objects.filter(email=email).exists():
-            raise forms.ValidationError("Ten email jest już zarejestrowany.")
+        email = self.cleaned_data.get('email', '').lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Ten adres email jest już zarejestrowany.")
         return email
 
     def save(self, commit=True):
