@@ -112,31 +112,29 @@ def home_view(request):
 
 @login_required(login_url='login')
 def create_channel_view(request):
-    # Tylko administratorzy mogą tworzyć kanały
-    if request.user.role not in ['admin', 'moderator']:
-        messages.error(request, "Nie masz uprawnień do tworzenia kanałów.")
-        return redirect('home')
-    
+    is_admin = request.user.role in ['admin', 'moderator']
+
     if request.method == 'POST':
         form = ChannelForm(request.POST)
         if form.is_valid():
             channel = form.save(commit=False)
             channel.created_by = request.user
+            if not is_admin:
+                channel.is_public = False
             channel.save()
-            
-            # Dodaj twórcę kanału do listy członków
+
             ChannelMembership.objects.create(
                 channel=channel,
                 user=request.user,
                 added_by=request.user
             )
-            
+
             messages.success(request, f"Kanał '{channel.name}' został utworzony.")
             return redirect('home')
     else:
         form = ChannelForm()
-    
-    context = {'form': form, 'action': 'Utwórz kanał'}
+
+    context = {'form': form, 'action': 'Utwórz kanał', 'is_admin': is_admin}
     return render(request, 'record_app/channel_form.html', context)
 
 
@@ -158,7 +156,8 @@ def edit_channel_view(request, channel_id):
     else:
         form = ChannelForm(instance=channel)
     
-    context = {'form': form, 'action': 'Edytuj kanał', 'channel': channel}
+    is_admin = request.user.role in ['admin', 'moderator']
+    context = {'form': form, 'action': 'Edytuj kanał', 'channel': channel, 'is_admin': is_admin}
     return render(request, 'record_app/channel_form.html', context)
 
 

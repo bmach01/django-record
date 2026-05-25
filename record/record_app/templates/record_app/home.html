@@ -17,11 +17,9 @@
                 <h5>
                     📡 Kanały
                 </h5>
-                {% if is_admin %}
                 <a href="{% url 'create_channel' %}" class="btn btn-sm btn-primary">
                     ➕ Nowy kanał
                 </a>
-                {% endif %}
             </div>
 
             <div class="channels-grid">
@@ -31,14 +29,14 @@
                     <div class="channel-list" id="text-channels-list">
                         {% for channel in text_channels %}
                         <div class="channel-item" data-channel-id="{{ channel.id }}">
-                            <a href="?channel_id={{ channel.id }}" 
+                            <a href="?channel_id={{ channel.id }}"
                                class="channel-link {% if selected_channel.id == channel.id %}active{% endif %}">
                                 # {{ channel.name }}
                                 {% if channel.is_public %}
                                 <span class="badge-public">🌐</span>
                                 {% endif %}
                             </a>
-                            {% if is_admin %}
+                            {% if is_admin or channel.created_by == user %}
                             <div class="channel-actions">
                                 <a href="{% url 'edit_channel' channel.id %}" title="Edytuj" class="action-btn">✏️</a>
                                 <a href="{% url 'invite_channel' channel.id %}" title="Zaproś" class="action-btn">👥</a>
@@ -68,7 +66,7 @@
                                 <span class="badge-public">🌐</span>
                                 {% endif %}
                             </a>
-                            {% if is_admin %}
+                            {% if is_admin or channel.created_by == user %}
                             <div class="channel-actions">
                                 <a href="{% url 'edit_channel' channel.id %}" title="Edytuj" class="action-btn">✏️</a>
                                 <a href="{% url 'invite_channel' channel.id %}" title="Zaproś" class="action-btn">👥</a>

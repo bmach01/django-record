@@ -23,9 +23,10 @@
                 {% endif %}
 
                 {% for field in form %}
+                {% if field.name != 'is_public' or is_admin %}
                 <div class="mb-3">
                     {{ field.label_tag }}
-                    
+
                     {% if field.field.widget.input_type == 'checkbox' %}
                     <div class="form-check">
                         {{ field }}
@@ -49,6 +50,7 @@
                     </div>
                     {% endif %}
                 </div>
+                {% endif %}
                 {% endfor %}
 
                 <div style="display: flex; gap: 10px;">
