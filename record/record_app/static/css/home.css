@@ -626,7 +626,8 @@
 }
 
 /* ===== MODERACJA ===== */
-.delete-msg-btn {
+.delete-msg-btn,
+.ban-msg-btn {
     display: none;
     background: none;
     border: none;
@@ -634,14 +635,22 @@
     font-size: 0.85rem;
     padding: 2px 5px;
     border-radius: 4px;
-    color: #dc3545;
     opacity: 0.6;
-    margin-left: auto;
     transition: opacity 0.15s, background-color 0.15s;
     line-height: 1;
 }
 
-.message:hover .delete-msg-btn {
+.delete-msg-btn {
+    color: #dc3545;
+    margin-left: auto;
+}
+
+.ban-msg-btn {
+    color: #e67e22;
+}
+
+.message:hover .delete-msg-btn,
+.message:hover .ban-msg-btn {
     display: inline-flex;
     align-items: center;
 }
@@ -649,6 +658,11 @@
 .delete-msg-btn:hover {
     opacity: 1;
     background-color: #fde8ea;
+}
+
+.ban-msg-btn:hover {
+    opacity: 1;
+    background-color: #fef3e8;
 }
 
 .voice-kick-btn {

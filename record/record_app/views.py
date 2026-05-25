@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.urls import reverse
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from .forms import LoginForm, RegisterForm, ChannelForm, MessageForm, PrivateMessageForm, StartPrivateConversationForm, ProfileForm
 from .models import Channel, ChannelMembership, Message, PrivateConversation, PrivateMessage
 
@@ -339,6 +341,10 @@ def ban_user_view(request, user_id):
     else:
         target.is_banned = True
         target.save()
+        async_to_sync(get_channel_layer().group_send)(
+            f"user_{target.id}_channels",
+            {"type": "user_banned"},
+        )
         messages.success(request, f"Użytkownik '{target.username}' został zablokowany.", extra_tags='moderation')
 
     return redirect('user_list')

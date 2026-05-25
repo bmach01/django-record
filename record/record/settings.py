@@ -51,8 +51,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "record_app.middleware.BannedUserMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "record_app.middleware.BannedUserMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

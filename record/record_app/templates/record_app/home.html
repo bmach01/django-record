@@ -132,6 +132,11 @@
                                     <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
                                     {% if is_admin %}
                                     <button class="delete-msg-btn" data-message-id="{{ message.id }}" title="Usuń wiadomość">🗑️</button>
+                                    {% if message.author != request.user and message.author.role != 'admin' %}
+                                    {% if request.user.role == 'admin' or message.author.role == 'user' %}
+                                    <button class="ban-msg-btn" data-user-id="{{ message.author.id }}" data-username="{{ message.author.username }}" title="Zablokuj użytkownika">🔨</button>
+                                    {% endif %}
+                                    {% endif %}
                                     {% endif %}
                                 </div>
                                 {% if message.content %}
@@ -278,6 +283,7 @@
     const userId = "{{ user.id }}";
     const username = "{{ user.username }}";
     const isModerator = {{ is_admin|lower }};
+    const userRole = "{{ request.user.role }}";
     let chatSocket = null;
     let channelSocket = null;
 
@@ -382,6 +388,18 @@
             }
         } else if (data.type === 'user_added_to_channel') {
             location.reload();
+        } else if (data.type === 'user_banned') {
+            document.body.style.pointerEvents = 'none';
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            overlay.innerHTML = '<div style="background:white;border-radius:12px;padding:2rem 2.5rem;text-align:center;max-width:380px;">' +
+                '<div style="font-size:2.5rem;margin-bottom:1rem;">🚫</div>' +
+                '<h3 style="margin:0 0 0.5rem;color:#333;">Konto zablokowane</h3>' +
+                '<p style="color:#666;margin:0 0 1.5rem;">Twoje konto zostało zablokowane przez moderatora.</p>' +
+                '<p style="color:#999;font-size:0.9rem;">Za chwilę nastąpi wylogowanie...</p>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            setTimeout(() => { location.href = '/logout/'; }, 3000);
         }
     }
 
@@ -413,11 +431,17 @@
             minute: '2-digit'
         });
 
+        const canBan = isModerator &&
+            data.user_id !== parseInt(userId) &&
+            data.user_role !== 'admin' &&
+            !(userRole === 'moderator' && data.user_role === 'moderator');
+
         let bodyHTML = `
             <div class="message-header">
                 <strong class="message-author">${escapeHtml(data.username)}</strong>
                 <span class="message-time">${timestamp}</span>
                 ${isModerator ? `<button class="delete-msg-btn" data-message-id="${data.message_id}" title="Usuń wiadomość">🗑️</button>` : ''}
+                ${canBan ? `<button class="ban-msg-btn" data-user-id="${data.user_id}" data-username="${escapeHtml(data.username)}" title="Zablokuj użytkownika">🔨</button>` : ''}
             </div>
         `;
         if (data.message) bodyHTML += `<div class="message-content">${escapeHtml(data.message)}</div>`;
@@ -757,7 +781,14 @@
         
         addLightboxToImages();
 
-        // Usuwanie wiadomości przez moderatorów/adminów
+        function getCsrfToken() {
+            const match = document.cookie.split(';')
+                .map(c => c.trim())
+                .find(c => c.startsWith('csrftoken='));
+            return match ? match.split('=')[1] : '';
+        }
+
+        // Usuwanie i banowanie wiadomości przez moderatorów/adminów
         const messagesContainer = document.getElementById('messages-container');
         if (messagesContainer && isModerator) {
             messagesContainer.addEventListener('click', (e) => {
@@ -769,6 +800,23 @@
                             message_id: messageId,
                         }));
                     }
+                }
+
+                if (e.target.classList.contains('ban-msg-btn')) {
+                    const targetUserId = e.target.getAttribute('data-user-id');
+                    const targetUsername = e.target.getAttribute('data-username');
+                    if (!confirm(`Czy na pewno chcesz zablokować użytkownika ${targetUsername}?`)) return;
+
+                    fetch(`/users/${targetUserId}/ban/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCsrfToken() },
+                    }).then(() => {
+                        document.querySelectorAll(`.ban-msg-btn[data-user-id="${targetUserId}"]`)
+                            .forEach(btn => btn.remove());
+                        showNotification(`Użytkownik ${targetUsername} został zablokowany.`, 'notification-join');
+                    }).catch(() => {
+                        showNotification('Nie udało się zablokować użytkownika.', 'notification-leave');
+                    });
                 }
             });
         }

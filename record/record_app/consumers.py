@@ -84,6 +84,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                             "message": content,
                             "username": self.user.username,
                             "user_id": self.user.id,
+                            "user_role": self.user.role,
                             "avatar_url": self.user.avatar_url,
                             "timestamp": message.created_at.isoformat(),
                             "message_id": message.id,
@@ -124,6 +125,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message": event["message"],
             "username": event["username"],
             "user_id": event["user_id"],
+            "user_role": event.get("user_role", "user"),
             "avatar_url": event.get("avatar_url"),
             "timestamp": event["timestamp"],
             "message_id": event["message_id"],
@@ -341,6 +343,9 @@ class ChannelUpdateConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def user_banned(self, event):
+        await self.send(text_data=json.dumps({"type": "user_banned"}))
+
 
 class PrivateChatConsumer(AsyncWebsocketConsumer):
     """
@@ -394,6 +399,7 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
                             "message": content,
                             "username": self.user.username,
                             "user_id": self.user.id,
+                            "user_role": self.user.role,
                             "avatar_url": self.user.avatar_url,
                             "timestamp": message.created_at.isoformat(),
                             "message_id": message.id,
@@ -418,6 +424,7 @@ class PrivateChatConsumer(AsyncWebsocketConsumer):
             "message": event["message"],
             "username": event["username"],
             "user_id": event["user_id"],
+            "user_role": event.get("user_role", "user"),
             "avatar_url": event.get("avatar_url"),
             "timestamp": event["timestamp"],
             "message_id": event["message_id"],
