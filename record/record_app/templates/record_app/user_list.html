@@ -1,0 +1,92 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Zarządzanie użytkownikami - Record{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/user_list.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="user-list-wrapper">
+    <div class="user-list-content">
+
+        <div class="user-list-header">
+            <h2>Zarządzanie użytkownikami</h2>
+            <a href="{% url 'home' %}" class="btn btn-secondary">← Powrót</a>
+        </div>
+
+        {% for message in messages %}
+        {% if 'moderation' in message.tags %}
+        <div class="mod-alert {% if 'error' in message.tags %}mod-alert-error{% else %}mod-alert-success{% endif %}">
+            {{ message }}
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <form method="get" class="user-list-search">
+            <input type="text" name="q" value="{{ query }}" placeholder="Szukaj po nicku..."
+                   class="form-control">
+            <button type="submit" class="btn btn-primary">Szukaj</button>
+            {% if query %}
+            <a href="{% url 'user_list' %}" class="btn btn-secondary">✕ Wyczyść</a>
+            {% endif %}
+        </form>
+
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Użytkownik</th>
+                    <th>Rola</th>
+                    <th>Status</th>
+                    <th>Akcje</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td>
+                        <div class="user-cell">
+                            <img src="{{ u.avatar_url }}" alt="{{ u.username }}" class="avatar avatar-sm">
+                            <span>{{ u.username }}</span>
+                        </div>
+                    </td>
+                    <td>{{ u.get_role_display }}</td>
+                    <td>
+                        {% if u.is_banned %}
+                        <span class="status-banned">🔴 Zablokowany</span>
+                        {% else %}
+                        <span class="status-active">🟢 Aktywny</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if u.role == 'admin' %}
+                        <span class="no-action">Brak akcji</span>
+                        {% elif request.user.role == 'moderator' and u.role == 'moderator' %}
+                        <span class="no-action">Brak uprawnień</span>
+                        {% elif u.is_banned %}
+                        <form method="post" action="{% url 'unban_user' u.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-success">✅ Odblokuj</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="{% url 'ban_user' u.id %}"
+                              onsubmit="return confirm('Czy na pewno chcesz zablokować użytkownika {{ u.username }}?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger">🔨 Zablokuj</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="user-table-empty">
+                    <td colspan="4">Brak użytkowników{% if query %} pasujących do „{{ query }}"{% endif %}.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+</div>
+{% endblock %}

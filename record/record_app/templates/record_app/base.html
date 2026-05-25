@@ -20,6 +20,9 @@
                     <strong>{{ user.username }}</strong>
                 </a>
                 <a href="{% url 'private_conversations' %}">💬 Wiadomości</a>
+                {% if user.role == 'admin' or user.role == 'moderator' %}
+                <a href="{% url 'user_list' %}">🛡️ Użytkownicy</a>
+                {% endif %}
                 <a href="{% url 'logout' %}">Wyloguj się</a>
             {% else %}
                 <a href="{% url 'login' %}">Logowanie</a>

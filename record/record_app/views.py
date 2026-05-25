@@ -22,9 +22,12 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             
             if user is not None:
-                login(request, user)
-                messages.success(request, f"Zalogowany jako {username}")
-                return redirect('home')
+                if user.is_banned:
+                    messages.error(request, "Twoje konto zostało zablokowane.")
+                else:
+                    login(request, user)
+                    messages.success(request, f"Zalogowany jako {username}")
+                    return redirect('home')
             else:
                 messages.error(request, "Zła nazwa użytkownika lub hasło.")
     else:
@@ -107,7 +110,7 @@ def home_view(request):
                        selected_channel.is_public or \
                        selected_channel.created_by == request.user
             
-            if not is_member and not request.user.role == 'admin':
+            if not is_member and request.user.role not in ['admin', 'moderator']:
                 messages.error(request, "Nie masz dostępu do tego kanału.")
                 selected_channel = None
             else:
@@ -297,6 +300,69 @@ def private_chat_view(request, conversation_id):
         'messages': private_messages,
     }
     return render(request, 'record_app/private_chat.html', context)
+
+
+@login_required(login_url='login')
+def user_list_view(request):
+    if request.user.role not in ['admin', 'moderator']:
+        messages.error(request, "Nie masz uprawnień.")
+        return redirect('home')
+
+    query = request.GET.get('q', '').strip()
+    users = User.objects.exclude(id=request.user.id).order_by('username')
+    if query:
+        users = users.filter(username__icontains=query)
+    return render(request, 'record_app/user_list.html', {
+        'users': users,
+        'is_admin': request.user.role == 'admin',
+        'query': query,
+    })
+
+
+@login_required(login_url='login')
+def ban_user_view(request, user_id):
+    if request.user.role not in ['admin', 'moderator']:
+        messages.error(request, "Nie masz uprawnień.")
+        return redirect('home')
+
+    if request.method != 'POST':
+        return redirect('user_list')
+
+    target = get_object_or_404(User, id=user_id)
+
+    if target == request.user:
+        messages.error(request, "Nie możesz zablokować siebie.", extra_tags='moderation')
+    elif target.role == 'admin':
+        messages.error(request, "Nie można zablokować administratora.", extra_tags='moderation')
+    elif request.user.role == 'moderator' and target.role == 'moderator':
+        messages.error(request, "Moderator nie może zablokować innego moderatora.", extra_tags='moderation')
+    else:
+        target.is_banned = True
+        target.save()
+        messages.success(request, f"Użytkownik '{target.username}' został zablokowany.", extra_tags='moderation')
+
+    return redirect('user_list')
+
+
+@login_required(login_url='login')
+def unban_user_view(request, user_id):
+    if request.user.role not in ['admin', 'moderator']:
+        messages.error(request, "Nie masz uprawnień.")
+        return redirect('home')
+
+    if request.method != 'POST':
+        return redirect('user_list')
+
+    target = get_object_or_404(User, id=user_id)
+
+    if request.user.role == 'moderator' and target.role == 'moderator':
+        messages.error(request, "Moderator nie może odblokować innego moderatora.", extra_tags='moderation')
+    else:
+        target.is_banned = False
+        target.save()
+        messages.success(request, f"Użytkownik '{target.username}' został odblokowany.", extra_tags='moderation')
+
+    return redirect('user_list')
 
 
 @login_required(login_url='login')
