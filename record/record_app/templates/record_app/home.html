@@ -126,6 +126,9 @@
                             <div class="message-header">
                                 <strong class="message-author">{{ message.author.username }}</strong>
                                 <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
+                                {% if is_admin %}
+                                <button class="delete-msg-btn" data-message-id="{{ message.id }}" title="Usuń wiadomość">🗑️</button>
+                                {% endif %}
                             </div>
                             {% if message.content %}
                             <div class="message-content">{{ message.content }}</div>
@@ -269,6 +272,7 @@
     const channelType = "{{ selected_channel.channel_type|default:'' }}";
     const userId = "{{ user.id }}";
     const username = "{{ user.username }}";
+    const isModerator = {{ is_admin|lower }};
     let chatSocket = null;
     let channelSocket = null;
 
@@ -349,6 +353,9 @@
             showNotification(`${data.username} dołączył do kanału`, 'notification-join');
         } else if (data.type === 'user_left') {
             showNotification(`${data.username} opuścił kanał`, 'notification-leave');
+        } else if (data.type === 'message_deleted') {
+            const msg = document.querySelector(`[data-message-id="${data.message_id}"]`);
+            if (msg) msg.remove();
         }
     }
 
@@ -401,6 +408,7 @@
             <div class="message-header">
                 <strong class="message-author">${escapeHtml(data.username)}</strong>
                 <span class="message-time">${timestamp}</span>
+                ${isModerator ? `<button class="delete-msg-btn" data-message-id="${data.message_id}" title="Usuń wiadomość">🗑️</button>` : ''}
             </div>
         `;
         
@@ -736,6 +744,22 @@
         
         addLightboxToImages();
 
+        // Usuwanie wiadomości przez moderatorów/adminów
+        const messagesContainer = document.getElementById('messages-container');
+        if (messagesContainer && isModerator) {
+            messagesContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-msg-btn')) {
+                    const messageId = parseInt(e.target.getAttribute('data-message-id'));
+                    if (chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+                        chatSocket.send(JSON.stringify({
+                            type: 'delete_message',
+                            message_id: messageId,
+                        }));
+                    }
+                }
+            });
+        }
+
         // Inicjalizuj WebSockety
         if (channelType === 'text') {
             initChatSocket();
@@ -856,6 +880,18 @@
                 const pIdx = presenceParticipants.findIndex(p => p.user_id === data.user_id);
                 if (pIdx !== -1) presenceParticipants[pIdx].muted = data.muted;
                 updateParticipantMuteStatus(data.user_id, data.muted);
+                break;
+            }
+
+            case 'voice_kicked': {
+                // Rozłącz natychmiast, zanim wyświetlisz powiadomienie
+                document.getElementById('voice-leave-btn')?.click();
+                const kickMsg = document.createElement('div');
+                kickMsg.className = 'voice-kick-notification';
+                kickMsg.textContent = `Zostałeś wyrzucony z kanału przez ${escapeHtml(data.kicked_by)}.`;
+                const notJoinedEl = document.getElementById('voice-not-joined');
+                if (notJoinedEl) notJoinedEl.appendChild(kickMsg);
+                setTimeout(() => kickMsg.remove(), 5000);
                 break;
             }
 
@@ -991,6 +1027,10 @@
         const list = document.getElementById('voice-participants-list');
         if (!list || document.getElementById(`voice-participant-${peerId}`)) return;
 
+        const kickBtn = (isModerator && parseInt(userId) !== peerId)
+            ? `<button class="voice-kick-btn" data-peer-id="${peerId}" title="Wyrzuć z kanału">🚫</button>`
+            : '';
+
         const card = document.createElement('div');
         card.id = `voice-participant-${peerId}`;
         card.className = 'voice-participant-card';
@@ -1001,6 +1041,7 @@
                 <span class="participant-dot"></span>
                 <span class="participant-mute-icon">${muted ? '🔇' : '🎤'}</span>
             </div>
+            ${kickBtn}
         `;
         list.appendChild(card);
     }
@@ -1030,6 +1071,22 @@
         const joinBtn = document.getElementById('voice-join-btn');
         const muteBtn = document.getElementById('voice-mute-btn');
         const leaveBtn = document.getElementById('voice-leave-btn');
+
+        // Wyrzucanie użytkowników z voice przez moderatorów/adminów
+        const participantsList = document.getElementById('voice-participants-list');
+        if (participantsList && isModerator) {
+            participantsList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('voice-kick-btn')) {
+                    const peerId = parseInt(e.target.getAttribute('data-peer-id'));
+                    if (voiceSocket && voiceSocket.readyState === WebSocket.OPEN) {
+                        voiceSocket.send(JSON.stringify({
+                            type: 'voice_kick',
+                            target_user_id: peerId,
+                        }));
+                    }
+                }
+            });
+        }
 
         if (joinBtn) {
             joinBtn.addEventListener('click', async () => {

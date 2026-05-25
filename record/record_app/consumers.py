@@ -74,7 +74,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 content = data.get("message", "").strip()
                 image_data = data.get("image")  # base64 encoded image
                 audio_data = data.get("audio")  # base64 encoded audio
-                
+
                 if content or image_data or audio_data:
                     # Zapisz wiadomość do bazy danych
                     message = await self.save_message(content, image_data, audio_data)
@@ -88,19 +88,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
                             "timestamp": message.created_at.isoformat(),
                             "message_id": message.id,
                         }
-                        
+
                         # Jeśli jest obrazek, dodaj jego URL
                         if message.image:
                             broadcast_data["image_url"] = message.image.url
-                        
+
                         # Jeśli jest nagranie, dodaj jego URL
                         if message.audio:
                             broadcast_data["audio_url"] = message.audio.url
-                        
+
                         # Wyślij do grupy
                         await self.channel_layer.group_send(
                             self.channel_group_name,
                             broadcast_data,
+                        )
+
+            elif message_type == "delete_message":
+                message_id = data.get("message_id")
+                if message_id and self.user.role in ["admin", "moderator"]:
+                    deleted = await self.delete_message(message_id)
+                    if deleted:
+                        await self.channel_layer.group_send(
+                            self.channel_group_name,
+                            {
+                                "type": "message_deleted",
+                                "message_id": message_id,
+                            },
                         )
         except json.JSONDecodeError:
             pass
@@ -156,6 +169,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def message_deleted(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "message_deleted",
+            "message_id": event["message_id"],
+        }))
+
     async def channel_updated(self, event):
         """
         Receive channel update notification.
@@ -170,6 +189,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+    @database_sync_to_async
+    def delete_message(self, message_id):
+        try:
+            message = Message.objects.get(id=message_id, channel_id=self.channel_id)
+            message.delete()
+            return True
+        except Message.DoesNotExist:
+            return False
 
     @database_sync_to_async
     def check_channel_access(self):
@@ -585,6 +613,18 @@ class VoiceConsumer(AsyncWebsocketConsumer):
                         "muted": muted,
                     })
 
+            elif msg_type == "voice_kick":
+                target_user_id = data.get("target_user_id")
+                if target_user_id and self.user.role in ["admin", "moderator"]:
+                    target_user_id = int(target_user_id)
+                    participants = self.voice_participants.get(self.channel_id, {})
+                    target = participants.get(target_user_id)
+                    if target:
+                        await self.channel_layer.send(target["channel_name"], {
+                            "type": "voice_kicked_signal",
+                            "kicked_by": self.user.username,
+                        })
+
             elif msg_type in ("webrtc_offer", "webrtc_answer", "webrtc_ice_candidate"):
                 target_user_id = data.get("target_user_id")
                 if target_user_id is None:
@@ -642,6 +682,12 @@ class VoiceConsumer(AsyncWebsocketConsumer):
             "type": "voice_mute_status",
             "user_id": event["user_id"],
             "muted": event["muted"],
+        }))
+
+    async def voice_kicked_signal(self, event):
+        await self.send(json.dumps({
+            "type": "voice_kicked",
+            "kicked_by": event["kicked_by"],
         }))
 
     @database_sync_to_async
