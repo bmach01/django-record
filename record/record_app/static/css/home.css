@@ -173,20 +173,12 @@
 
 
 
-* {
-    box-sizing: border-box;
-}
-
-body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-}
 
 .record-wrapper {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 60px); /* Minus navbar height */
+    flex: 1;
+    min-height: 0;
 }
 
 .record-layout {

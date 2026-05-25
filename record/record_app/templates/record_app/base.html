@@ -15,7 +15,7 @@
         </div>
         <div>
             {% if user.is_authenticated %}
-                <a href="{% url 'profile' %}" class="nav-avatar-wrap" style="margin-left:1rem;">
+                <a href="{% url 'profile' %}" class="nav-avatar-wrap">
                     <img src="{{ user.avatar_url }}" alt="{{ user.username }}" class="avatar avatar-sm">
                     <strong>{{ user.username }}</strong>
                 </a>
@@ -28,7 +28,9 @@
         </div>
     </nav>
 
-    {% block content %}
-    {% endblock %}
+    <div class="content-area">
+        {% block content %}
+        {% endblock %}
+    </div>
 </body>
 </html>

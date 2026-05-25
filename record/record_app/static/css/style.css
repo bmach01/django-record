@@ -8,9 +8,18 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+.content-area {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 /* Navigation */
@@ -21,6 +30,11 @@ nav {
     justify-content: space-between;
     align-items: center;
     color: white;
+}
+
+nav > div {
+    display: flex;
+    align-items: center;
 }
 
 nav a, nav button {
@@ -34,6 +48,7 @@ nav a, nav button {
     padding: 0.5rem 1rem;
     border-radius: 4px;
     transition: background 0.3s;
+    line-height: 1;
 }
 
 nav a:hover, nav button:hover {
@@ -70,6 +85,7 @@ nav a:hover, nav button:hover {
     gap: 8px;
     color: white;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .nav-avatar-wrap:hover {
