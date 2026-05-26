@@ -3,11 +3,13 @@ from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
+from django.http import JsonResponse
 from django.urls import reverse
+from django.utils import timezone
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .forms import LoginForm, RegisterForm, ChannelForm, MessageForm, PrivateMessageForm, StartPrivateConversationForm, ProfileForm
-from .models import Channel, ChannelMembership, Message, PrivateConversation, PrivateMessage
+from .models import Channel, ChannelMembership, Message, PrivateConversation, PrivateMessage, Report
 
 User = get_user_model()
 
@@ -369,6 +371,126 @@ def unban_user_view(request, user_id):
         messages.success(request, f"Użytkownik '{target.username}' został odblokowany.", extra_tags='moderation')
 
     return redirect('user_list')
+
+
+@login_required(login_url='login')
+def report_message_view(request, message_id):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metoda niedozwolona.'}, status=405)
+
+    message = get_object_or_404(Message, id=message_id)
+
+    if message.author == request.user:
+        return JsonResponse({'success': False, 'error': 'Nie możesz zgłosić własnej wiadomości.'}, status=400)
+
+    reason = request.POST.get('reason', '').strip()
+
+    report, created = Report.objects.get_or_create(
+        message=message,
+        reported_by=request.user,
+        defaults={
+            'message_author': message.author,
+            'message_preview': message.content[:500],
+            'reason': reason,
+        }
+    )
+
+    if not created:
+        return JsonResponse({'success': False, 'error': 'Już zgłosiłeś tę wiadomość.'}, status=400)
+
+    return JsonResponse({'success': True})
+
+
+@login_required(login_url='login')
+def reports_list_view(request):
+    if request.user.role not in ['admin', 'moderator']:
+        messages.error(request, "Nie masz uprawnień.")
+        return redirect('home')
+
+    tab = request.GET.get('tab', 'pending')
+    if tab == 'resolved':
+        reports = Report.objects.filter(status='resolved').select_related(
+            'message', 'message__channel', 'message_author', 'reported_by', 'resolved_by'
+        )
+    else:
+        tab = 'pending'
+        reports = Report.objects.filter(status='pending').select_related(
+            'message', 'message__channel', 'message_author', 'reported_by'
+        )
+
+    return render(request, 'record_app/reports.html', {
+        'reports': reports,
+        'tab': tab,
+    })
+
+
+@login_required(login_url='login')
+def resolve_report_view(request, report_id):
+    if request.user.role not in ['admin', 'moderator']:
+        messages.error(request, "Nie masz uprawnień.")
+        return redirect('home')
+
+    if request.method != 'POST':
+        return redirect('reports_list')
+
+    report = get_object_or_404(Report, id=report_id)
+    action = request.POST.get('action')
+
+    if action == 'delete_message':
+        if report.message:
+            message = report.message
+            # Resolve all pending reports for this message
+            Report.objects.filter(message=message, status='pending').update(
+                status='resolved',
+                resolved_by=request.user,
+                resolved_at=timezone.now(),
+                action_taken='delete_message',
+            )
+            message.delete()
+        else:
+            report.status = 'resolved'
+            report.resolved_by = request.user
+            report.resolved_at = timezone.now()
+            report.action_taken = 'delete_message'
+            report.save()
+        messages.success(request, "Wiadomość została usunięta.", extra_tags='moderation')
+
+    elif action == 'ban_user':
+        target = report.message_author
+        if target is None:
+            messages.error(request, "Autor wiadomości nie istnieje.", extra_tags='moderation')
+        elif target == request.user:
+            messages.error(request, "Nie możesz zablokować siebie.", extra_tags='moderation')
+        elif target.role == 'admin':
+            messages.error(request, "Nie można zablokować administratora.", extra_tags='moderation')
+        elif request.user.role == 'moderator' and target.role == 'moderator':
+            messages.error(request, "Moderator nie może zablokować innego moderatora.", extra_tags='moderation')
+        else:
+            target.is_banned = True
+            target.save()
+            async_to_sync(get_channel_layer().group_send)(
+                f"user_{target.id}_channels",
+                {"type": "user_banned"},
+            )
+            report.status = 'resolved'
+            report.resolved_by = request.user
+            report.resolved_at = timezone.now()
+            report.action_taken = 'ban_user'
+            report.save()
+            messages.success(request, f"Użytkownik '{target.username}' został zablokowany.", extra_tags='moderation')
+
+    elif action == 'dismiss':
+        report.status = 'resolved'
+        report.resolved_by = request.user
+        report.resolved_at = timezone.now()
+        report.action_taken = 'dismissed'
+        report.save()
+        messages.success(request, "Zgłoszenie zostało odrzucone.", extra_tags='moderation')
+
+    else:
+        messages.error(request, "Nieznana akcja.", extra_tags='moderation')
+
+    return redirect('reports_list')
 
 
 @login_required(login_url='login')

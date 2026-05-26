@@ -118,6 +118,39 @@ class PrivateConversation(models.Model):
         return self.participant1
 
 
+class Report(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Oczekujące'),
+        ('resolved', 'Rozwiązane'),
+    ]
+    ACTION_CHOICES = [
+        ('delete_message', 'Usunięto wiadomość'),
+        ('ban_user', 'Zablokowano użytkownika'),
+        ('dismissed', 'Odrzucono'),
+    ]
+
+    message = models.ForeignKey(Message, on_delete=models.SET_NULL, null=True, blank=True, related_name='reports')
+    message_author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='received_reports')
+    message_preview = models.TextField(blank=True)
+    reported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='submitted_reports')
+    reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_reports')
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    action_taken = models.CharField(max_length=20, choices=ACTION_CHOICES, blank=True)
+
+    class Meta:
+        verbose_name = 'Zgłoszenie'
+        verbose_name_plural = 'Zgłoszenia'
+        ordering = ['-created_at']
+        unique_together = ('message', 'reported_by')
+
+    def __str__(self):
+        reporter = self.reported_by.username if self.reported_by else '?'
+        return f"Zgłoszenie przez {reporter} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
 class PrivateMessage(models.Model):
     """
     Pojedyncza wiadomość prywatna w konwersacji.

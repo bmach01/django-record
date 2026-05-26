@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Channel, Message, ChannelMembership, PrivateConversation, PrivateMessage
+from .models import User, Channel, Message, ChannelMembership, PrivateConversation, PrivateMessage, Report
 
 
 @admin.register(User)
@@ -60,6 +60,14 @@ class PrivateConversationAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         return queryset.select_related('participant1', 'participant2')
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    list_display = ('id', 'message_author', 'reported_by', 'status', 'action_taken', 'created_at', 'resolved_by')
+    list_filter = ('status', 'action_taken', 'created_at')
+    search_fields = ('message_author__username', 'reported_by__username', 'reason', 'message_preview')
+    readonly_fields = ('created_at', 'resolved_at')
 
 
 @admin.register(PrivateMessage)

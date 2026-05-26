@@ -138,6 +138,9 @@
                                     {% endif %}
                                     {% endif %}
                                     {% endif %}
+                                    {% if message.author != request.user %}
+                                    <button class="report-msg-btn" data-message-id="{{ message.id }}" data-username="{{ message.author.username }}" title="Zgłoś wiadomość">🚩</button>
+                                    {% endif %}
                                 </div>
                                 {% if message.content %}
                                 <div class="message-content">{{ message.content }}</div>
@@ -247,6 +250,21 @@
                 </div>
             </div>
             {% endif %}
+
+            <!-- Modal do zgłaszania wiadomości -->
+            <div id="report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+                <div style="background:white;border-radius:10px;padding:1.5rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+                    <h4 style="margin:0 0 0.25rem;color:#333;">🚩 Zgłoś wiadomość</h4>
+                    <p style="margin:0 0 1rem;font-size:0.85rem;color:#888;">Zgłoszenie trafi do moderatorów.</p>
+                    <p style="margin:0 0 0.75rem;font-size:0.9rem;color:#555;">Użytkownik: <strong id="report-modal-username"></strong></p>
+                    <label style="display:block;margin-bottom:0.3rem;font-size:0.88rem;font-weight:600;color:#444;">Powód (opcjonalnie)</label>
+                    <textarea id="report-reason" rows="3" placeholder="Opisz, dlaczego zgłaszasz tę wiadomość..." style="width:100%;padding:0.5rem 0.75rem;border:1px solid #ddd;border-radius:5px;font-size:0.9rem;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+                    <div style="display:flex;gap:0.5rem;margin-top:1rem;justify-content:flex-end;">
+                        <button id="report-modal-cancel" style="padding:0.45rem 1rem;border-radius:5px;border:1px solid #ddd;background:#f8f9fa;cursor:pointer;font-size:0.9rem;">Anuluj</button>
+                        <button id="report-modal-submit" style="padding:0.45rem 1rem;border-radius:5px;border:none;background:#e53935;color:white;cursor:pointer;font-size:0.9rem;font-weight:600;">Wyślij zgłoszenie</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Lightbox do powiększenia obrazków -->
             <div id="lightbox" class="lightbox">
@@ -436,12 +454,15 @@
             data.user_role !== 'admin' &&
             !(userRole === 'moderator' && data.user_role === 'moderator');
 
+        const canReport = data.user_id !== parseInt(userId);
+
         let bodyHTML = `
             <div class="message-header">
                 <strong class="message-author">${escapeHtml(data.username)}</strong>
                 <span class="message-time">${timestamp}</span>
                 ${isModerator ? `<button class="delete-msg-btn" data-message-id="${data.message_id}" title="Usuń wiadomość">🗑️</button>` : ''}
                 ${canBan ? `<button class="ban-msg-btn" data-user-id="${data.user_id}" data-username="${escapeHtml(data.username)}" title="Zablokuj użytkownika">🔨</button>` : ''}
+                ${canReport ? `<button class="report-msg-btn" data-message-id="${data.message_id}" data-username="${escapeHtml(data.username)}" title="Zgłoś wiadomość">🚩</button>` : ''}
             </div>
         `;
         if (data.message) bodyHTML += `<div class="message-content">${escapeHtml(data.message)}</div>`;
@@ -820,6 +841,73 @@
                 }
             });
         }
+
+        // Obsługa zgłaszania wiadomości
+        let reportTargetMessageId = null;
+        const reportModal = document.getElementById('report-modal');
+        const reportModalCancel = document.getElementById('report-modal-cancel');
+        const reportModalSubmit = document.getElementById('report-modal-submit');
+        const reportReasonInput = document.getElementById('report-reason');
+        const reportModalUsername = document.getElementById('report-modal-username');
+
+        function openReportModal(messageId, username) {
+            reportTargetMessageId = messageId;
+            reportModalUsername.textContent = username;
+            reportReasonInput.value = '';
+            reportModal.style.display = 'flex';
+            reportReasonInput.focus();
+        }
+
+        function closeReportModal() {
+            reportModal.style.display = 'none';
+            reportTargetMessageId = null;
+        }
+
+        if (reportModalCancel) {
+            reportModalCancel.addEventListener('click', closeReportModal);
+        }
+
+        if (reportModal) {
+            reportModal.addEventListener('click', (e) => {
+                if (e.target === reportModal) closeReportModal();
+            });
+        }
+
+        if (reportModalSubmit) {
+            reportModalSubmit.addEventListener('click', () => {
+                if (!reportTargetMessageId) return;
+                const reason = reportReasonInput.value.trim();
+                const formData = new FormData();
+                formData.append('reason', reason);
+                formData.append('csrfmiddlewaretoken', getCsrfToken());
+                reportModalSubmit.disabled = true;
+                fetch(`/message/${reportTargetMessageId}/report/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCsrfToken() },
+                    body: formData,
+                }).then(r => r.json()).then(data => {
+                    if (data.success) {
+                        showNotification('Wiadomość została zgłoszona.', 'notification-join');
+                    } else {
+                        showNotification(data.error || 'Nie udało się zgłosić wiadomości.', 'notification-leave');
+                    }
+                }).catch(() => {
+                    showNotification('Błąd sieci — spróbuj ponownie.', 'notification-leave');
+                }).finally(() => {
+                    reportModalSubmit.disabled = false;
+                    closeReportModal();
+                });
+            });
+        }
+
+        // Delegacja kliknięcia przycisku zgłoszenia
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('report-msg-btn')) {
+                const messageId = e.target.getAttribute('data-message-id');
+                const username = e.target.getAttribute('data-username');
+                openReportModal(messageId, username);
+            }
+        });
 
         // Inicjalizuj WebSockety
         if (channelType === 'text') {

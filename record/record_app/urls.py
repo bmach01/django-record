@@ -16,6 +16,10 @@ urlpatterns = [
     path('users/', views.user_list_view, name='user_list'),
     path('users/<int:user_id>/ban/', views.ban_user_view, name='ban_user'),
     path('users/<int:user_id>/unban/', views.unban_user_view, name='unban_user'),
+    # Zgłoszenia
+    path('message/<int:message_id>/report/', views.report_message_view, name='report_message'),
+    path('reports/', views.reports_list_view, name='reports_list'),
+    path('reports/<int:report_id>/resolve/', views.resolve_report_view, name='resolve_report'),
     # Prywatne wiadomości
     path('private/', views.private_conversations_view, name='private_conversations'),
     path('private/<int:conversation_id>/', views.private_chat_view, name='private_chat'),

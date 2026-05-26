@@ -55,6 +55,28 @@ nav a:hover, nav button:hover {
     background: rgba(255, 255, 255, 0.1);
 }
 
+.nav-reports-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.nav-badge {
+    background: #e53935;
+    color: white;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
 /* Avatars */
 .avatar {
     border-radius: 50%;

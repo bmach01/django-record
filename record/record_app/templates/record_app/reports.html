@@ -1,0 +1,172 @@
+{% extends "record_app/base.html" %}
+
+{% load static %}
+
+{% block title %}Zgłoszenia - Record{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/reports.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="reports-wrapper">
+    <div class="reports-content">
+
+        <div class="reports-header">
+            <h2>🚩 Zgłoszenia wiadomości</h2>
+            <a href="{% url 'home' %}" class="btn btn-secondary btn-sm">← Powrót</a>
+        </div>
+
+        {% for message in messages %}
+        {% if 'moderation' in message.tags %}
+        <div class="mod-alert {% if 'error' in message.tags %}mod-alert-error{% else %}mod-alert-success{% endif %}">
+            {{ message }}
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <!-- Tabs -->
+        <div class="reports-tabs">
+            <a href="?tab=pending" class="reports-tab {% if tab == 'pending' %}active{% endif %}">
+                Oczekujące
+                {% if tab == 'pending' and reports %}
+                <span class="tab-badge">{{ reports|length }}</span>
+                {% endif %}
+            </a>
+            <a href="?tab=resolved" class="reports-tab {% if tab == 'resolved' %}active{% endif %}">
+                Rozwiązane
+            </a>
+        </div>
+
+        {% if reports %}
+        <div class="report-list">
+            {% for report in reports %}
+            <div class="report-card {% if report.status == 'resolved' %}resolved{% endif %}">
+
+                <div class="report-card-header">
+                    <div class="report-meta">
+                        <span class="report-reporter">
+                            Zgłoszone przez: {{ report.reported_by.username|default:"(usunięty)" }}
+                        </span>
+                        <span class="report-date">{{ report.created_at|date:"d.m.Y H:i" }}</span>
+                    </div>
+                    <span class="report-status-badge {% if report.status == 'pending' %}report-status-pending{% else %}report-status-resolved{% endif %}">
+                        {% if report.status == 'pending' %}Oczekujące{% else %}Rozwiązane{% endif %}
+                    </span>
+                </div>
+
+                <div class="report-card-body">
+                    <!-- Wiadomość -->
+                    <div class="report-message-box">
+                        <div class="report-message-author">
+                            {% if report.message_author %}
+                            <img src="{{ report.message_author.avatar_url }}" alt="{{ report.message_author.username }}" width="24" height="24">
+                            {{ report.message_author.username }}
+                            <small style="color:#999;font-weight:400;">({{ report.message_author.get_role_display }})</small>
+                            {% else %}
+                            <span style="color:#aaa;">(usunięty użytkownik)</span>
+                            {% endif %}
+                        </div>
+                        {% if report.message %}
+                        <div class="report-message-channel">
+                            Kanał: #{{ report.message.channel.name }}
+                            &nbsp;·&nbsp; {{ report.message.created_at|date:"d.m.Y H:i" }}
+                        </div>
+                        {% if report.message.content %}
+                        <div class="report-message-content">{{ report.message.content }}</div>
+                        {% endif %}
+                        {% if report.message.image %}
+                        <div class="report-message-image">
+                            <img src="{{ report.message.image.url }}" alt="Obrazek w wiadomości">
+                        </div>
+                        {% endif %}
+                        {% if report.message.audio %}
+                        <div style="margin-top:0.4rem;">
+                            <audio controls style="height:32px;max-width:280px;">
+                                <source src="{{ report.message.audio.url }}" type="audio/webm">
+                                <source src="{{ report.message.audio.url }}" type="audio/mpeg">
+                            </audio>
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div class="report-message-deleted">
+                            Wiadomość została usunięta.
+                            {% if report.message_preview %}
+                            <br><span style="font-style:normal;color:#777;">Treść: {{ report.message_preview }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Powód -->
+                    {% if report.reason %}
+                    <div class="report-reason">
+                        <span class="report-reason-label">Powód:</span> {{ report.reason }}
+                    </div>
+                    {% else %}
+                    <div class="report-reason" style="color:#bbb;">Brak podanego powodu.</div>
+                    {% endif %}
+
+                    <!-- Akcje -->
+                    {% if report.status == 'pending' %}
+                    <div class="report-actions">
+                        {% if report.message %}
+                        <form method="post" action="{% url 'resolve_report' report.id %}"
+                              onsubmit="return confirm('Usunąć tę wiadomość i zamknąć zgłoszenie?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_message">
+                            <button type="submit" class="btn btn-danger btn-sm">🗑️ Usuń wiadomość</button>
+                        </form>
+                        {% endif %}
+
+                        {% if report.message_author and not report.message_author.is_banned %}
+                        {% if report.message_author.role != 'admin' %}
+                        {% if request.user.role == 'admin' or report.message_author.role == 'user' %}
+                        <form method="post" action="{% url 'resolve_report' report.id %}"
+                              onsubmit="return confirm('Zablokować użytkownika {{ report.message_author.username|default:'' }} i zamknąć zgłoszenie?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="ban_user">
+                            <button type="submit" class="btn btn-warning btn-sm">🔨 Zablokuj użytkownika</button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                        {% endif %}
+
+                        <form method="post" action="{% url 'resolve_report' report.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="dismiss">
+                            <button type="submit" class="btn btn-success btn-sm">✓ Odrzuć zgłoszenie</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <div class="report-resolution">
+                        Rozwiązano przez <strong>{{ report.resolved_by.username|default:"?" }}</strong>
+                        dnia {{ report.resolved_at|date:"d.m.Y H:i" }}
+                        &nbsp;·&nbsp;
+                        <strong>{{ report.get_action_taken_display }}</strong>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="reports-empty">
+            <div class="reports-empty-icon">
+                {% if tab == 'pending' %}✅{% else %}📋{% endif %}
+            </div>
+            <p>
+                {% if tab == 'pending' %}
+                Brak oczekujących zgłoszeń.
+                {% else %}
+                Brak rozwiązanych zgłoszeń.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

@@ -627,7 +627,8 @@
 
 /* ===== MODERACJA ===== */
 .delete-msg-btn,
-.ban-msg-btn {
+.ban-msg-btn,
+.report-msg-btn {
     display: none;
     background: none;
     border: none;
@@ -650,7 +651,8 @@
 }
 
 .message:hover .delete-msg-btn,
-.message:hover .ban-msg-btn {
+.message:hover .ban-msg-btn,
+.message:hover .report-msg-btn {
     display: inline-flex;
     align-items: center;
 }
@@ -663,6 +665,15 @@
 .ban-msg-btn:hover {
     opacity: 1;
     background-color: #fef3e8;
+}
+
+.report-msg-btn {
+    color: #e53935;
+}
+
+.report-msg-btn:hover {
+    opacity: 1;
+    background-color: #fde8ea;
 }
 
 .voice-kick-btn {

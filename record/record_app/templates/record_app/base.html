@@ -22,6 +22,12 @@
                 <a href="{% url 'private_conversations' %}">💬 Wiadomości</a>
                 {% if user.role == 'admin' or user.role == 'moderator' %}
                 <a href="{% url 'user_list' %}">🛡️ Użytkownicy</a>
+                <a href="{% url 'reports_list' %}" class="nav-reports-link">
+                    🚩 Zgłoszenia
+                    {% if pending_reports_count > 0 %}
+                    <span class="nav-badge">{{ pending_reports_count }}</span>
+                    {% endif %}
+                </a>
                 {% endif %}
                 <a href="{% url 'logout' %}">Wyloguj się</a>
             {% else %}
