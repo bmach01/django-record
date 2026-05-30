@@ -10,13 +10,6 @@
             <h3 style="margin:0;">Mój profil</h3>
         </div>
         <div class="card-body">
-
-            {% if messages %}
-            {% for msg in messages %}
-            <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
-            {% endfor %}
-            {% endif %}
-
             <!-- Aktualny avatar -->
             <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
                 <img src="{{ user.avatar_url }}" alt="avatar" class="avatar avatar-lg">
