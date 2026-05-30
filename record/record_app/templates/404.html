@@ -1,0 +1,18 @@
+{% extends "record_app/base.html" %}
+
+{% block title %}404 - Nie znaleziono strony{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="card" style="text-align: center; max-width: 480px;">
+        <div style="font-size: 5rem; line-height: 1; margin-bottom: 0.5rem;">404</div>
+        <h1 style="margin-bottom: 0.75rem;">Strona nie istnieje</h1>
+        <p style="color: #666; margin-bottom: 2rem;">
+            Szukana strona mogła zostać usunięta, zmieniona lub nigdy nie istniała.
+        </p>
+        <a href="{% url 'home' %}" class="btn" style="display: inline-block; width: auto; padding: 0.75rem 2rem; text-decoration: none;">
+            Wróć do strony głównej
+        </a>
+    </div>
+</div>
+{% endblock %}

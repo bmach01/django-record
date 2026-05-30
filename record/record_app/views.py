@@ -14,6 +14,10 @@ from .models import Channel, ChannelMembership, Message, PrivateConversation, Pr
 User = get_user_model()
 
 
+def custom_404(request, exception):
+    return render(request, '404.html', status=404)
+
+
 def login_view(request):
     if request.user.is_authenticated:
         return redirect('home')
