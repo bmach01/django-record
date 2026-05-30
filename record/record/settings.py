@@ -31,6 +31,10 @@ ALLOWED_HOSTS = [
     "django-record.onrender.com"
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://django-record.onrender.com"
+]
+
 
 # Application definition
 
