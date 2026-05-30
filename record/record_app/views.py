@@ -73,16 +73,23 @@ def logout_view(request):
 @login_required(login_url='login')
 def profile_view(request):
     if request.method == 'POST':
+        if 'avatar' in request.FILES:
+            from PIL import Image, ImageOps
+            import io
+            from django.core.files.uploadedfile import InMemoryUploadedFile
+            avatar_file = request.FILES['avatar']
+            with Image.open(avatar_file) as img:
+                img = img.convert('RGB')
+                img = ImageOps.fit(img, (128, 128), Image.LANCZOS)
+                buffer = io.BytesIO()
+                img.save(buffer, format='JPEG', quality=90, optimize=True)
+                buffer.seek(0)
+            request.FILES['avatar'] = InMemoryUploadedFile(
+                buffer, 'avatar', 'avatar.jpg', 'image/jpeg', buffer.getbuffer().nbytes, None
+            )
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
-            user = form.save()
-            if user.avatar and 'avatar' in request.FILES:
-                from PIL import Image, ImageOps
-                path = user.avatar.path
-                with Image.open(path) as img:
-                    img = img.convert('RGB')
-                    img = ImageOps.fit(img, (128, 128), Image.LANCZOS)
-                    img.save(path, quality=90, optimize=True)
+            form.save()
             messages.success(request, "Profil zaktualizowany.")
             return redirect('profile')
     else:
