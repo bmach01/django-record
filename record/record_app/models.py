@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.templatetags.static import static
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -22,7 +23,7 @@ class User(AbstractUser):
     def avatar_url(self):
         if self.avatar:
             return self.avatar.url
-        return f'{settings.MEDIA_URL}avatars/default_pfp.jpg'
+        return static('images/default_pfp.jpg')
 
     class Meta:
         verbose_name = 'Użytkownik'
